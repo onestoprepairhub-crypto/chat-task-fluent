@@ -84,6 +84,7 @@ export type Database = {
           default_snooze_minutes: number
           fcm_token: string | null
           id: string
+          push_subscription: Json | null
           quiet_end: string | null
           quiet_hours_enabled: boolean
           quiet_start: string | null
@@ -96,6 +97,7 @@ export type Database = {
           default_snooze_minutes?: number
           fcm_token?: string | null
           id?: string
+          push_subscription?: Json | null
           quiet_end?: string | null
           quiet_hours_enabled?: boolean
           quiet_start?: string | null
@@ -108,6 +110,7 @@ export type Database = {
           default_snooze_minutes?: number
           fcm_token?: string | null
           id?: string
+          push_subscription?: Json | null
           quiet_end?: string | null
           quiet_hours_enabled?: boolean
           quiet_start?: string | null

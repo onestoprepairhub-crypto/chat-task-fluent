@@ -2,6 +2,7 @@ import React from 'react';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { Task } from '@/hooks/useTasks';
 import { useNotifications } from '@/hooks/useNotifications';
+import { usePushSubscription } from '@/hooks/usePushSubscription';
 import { useToast } from '@/hooks/use-toast';
 
 // IST offset: UTC+5:30 = 330 minutes
@@ -44,6 +45,7 @@ export const useNotificationScheduler = ({
   onSnooze,
 }: UseNotificationSchedulerProps) => {
   const { isEnabled, showNotification } = useNotifications();
+  const { isSubscribed: isPushSubscribed, sendPushNotification } = usePushSubscription();
   const { toast } = useToast();
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const notifiedTasksRef = useRef<Set<string>>(new Set());
@@ -98,7 +100,15 @@ export const useNotificationScheduler = ({
     const title = customTitle || `${priorityEmoji} ${task.title}`;
     const body = customBody || (task.endDate ? `Due: ${task.endDate}` : 'Task reminder');
     
-    // Try to use notification with actions (requires service worker)
+    // First, try to send push notification (works even when app is closed)
+    if (isPushSubscribed) {
+      console.log('[NotificationScheduler] Sending push notification for:', task.title);
+      sendPushNotification(task.id, title, body).catch(err => {
+        console.log('[NotificationScheduler] Push notification failed:', err);
+      });
+    }
+    
+    // Also show local notification when app is open
     if ('serviceWorker' in navigator && 'showNotification' in ServiceWorkerRegistration.prototype) {
       navigator.serviceWorker.ready.then(registration => {
         registration.showNotification(title, {
@@ -116,17 +126,15 @@ export const useNotificationScheduler = ({
         } as NotificationOptions);
       }).catch(err => {
         console.log('[NotificationScheduler] Service worker notification failed, using fallback:', err);
-        // Fallback to basic notification
         showBasicNotification(task, title, body);
       });
     } else {
-      // Fallback for browsers without service worker support
       showBasicNotification(task, title, body);
     }
 
     // Always show in-app toast with action buttons
     showToastWithActions(task, title, body);
-  }, []);
+  }, [isPushSubscribed, sendPushNotification]);
 
   // Basic notification without actions
   const showBasicNotification = useCallback((task: Task, title: string, body: string) => {

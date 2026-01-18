@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check, Share, Plus, Sun, Monitor } from 'lucide-react';
+import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check, Share, Plus, Sun, Monitor, RefreshCw } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
+import { usePushSubscription } from '@/hooks/usePushSubscription';
 import { useTheme } from '@/hooks/useTheme';
 
 interface SettingsState {
@@ -37,6 +38,13 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
     needsHomeScreenInstall,
     iosInfo,
   } = useNotifications();
+
+  const {
+    isSubscribed: isPushSubscribed,
+    isLoading: isPushLoading,
+    subscribeToPush,
+    sendPushNotification,
+  } = usePushSubscription();
 
   const snoozeOptions = [10, 30, 60];
   const themeOptions = [
@@ -104,7 +112,7 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
             <p className="font-medium text-foreground">Enable Notifications</p>
             <p className="text-sm text-muted-foreground">
               {isEnabled 
-                ? 'Notifications are enabled' 
+                ? 'Browser notifications enabled' 
                 : 'Get reminders on your device'}
             </p>
           </div>
@@ -125,15 +133,68 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
           )}
         </div>
 
+        {/* Background Push Notifications (for iOS lock screen) */}
         {isEnabled && (
-          <Button
-            onClick={sendTestNotification}
-            variant="outline"
-            size="sm"
-            className="w-full rounded-xl"
-          >
-            Send Test Notification
-          </Button>
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-foreground">Background Notifications</p>
+                <p className="text-sm text-muted-foreground">
+                  {isPushSubscribed 
+                    ? 'Notifications work on lock screen' 
+                    : 'Get alerts even when app is closed'}
+                </p>
+              </div>
+              {isPushSubscribed ? (
+                <div className="flex items-center gap-2 text-success">
+                  <Check className="w-5 h-5" />
+                  <span className="text-sm font-medium">Active</span>
+                </div>
+              ) : (
+                <Button
+                  onClick={subscribeToPush}
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl"
+                  disabled={isPushLoading}
+                >
+                  {isPushLoading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Enable'
+                  )}
+                </Button>
+              )}
+            </div>
+            {iosInfo?.isIOS && iosInfo.isStandalone && (
+              <p className="text-xs text-muted-foreground mt-2">
+                📱 iOS: Notifications will appear on your lock screen and notification center
+              </p>
+            )}
+          </div>
+        )}
+
+        {isEnabled && (
+          <div className="flex gap-2">
+            <Button
+              onClick={sendTestNotification}
+              variant="outline"
+              size="sm"
+              className="flex-1 rounded-xl"
+            >
+              Test In-App
+            </Button>
+            {isPushSubscribed && (
+              <Button
+                onClick={() => sendPushNotification('test', '🧪 Test Notification', 'Background push is working!')}
+                variant="outline"
+                size="sm"
+                className="flex-1 rounded-xl"
+              >
+                Test Push
+              </Button>
+            )}
+          </div>
         )}
 
         {!isSupported && !iosInfo?.isIOS && (
