@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check } from 'lucide-react';
+import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check, Share, Plus } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -30,7 +30,9 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
     isEnabled, 
     permissionStatus,
     requestPermission, 
-    sendTestNotification 
+    sendTestNotification,
+    needsHomeScreenInstall,
+    iosInfo,
   } = useNotifications();
 
   const snoozeOptions = [10, 30, 60];
@@ -51,6 +53,44 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
           Push Notifications
         </h2>
 
+        {/* iOS Home Screen Installation Guide */}
+        {needsHomeScreenInstall && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
+            <p className="text-sm font-medium text-foreground">
+              📱 Add to Home Screen for Notifications
+            </p>
+            <p className="text-xs text-muted-foreground">
+              iOS requires apps to be installed on your Home Screen to receive push notifications.
+            </p>
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">1</div>
+                <span>Tap the <Share className="w-4 h-4 inline mx-1" /> Share button in Safari</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">2</div>
+                <span>Scroll down and tap <Plus className="w-4 h-4 inline mx-1" /> "Add to Home Screen"</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">3</div>
+                <span>Open the app from your Home Screen</span>
+              </div>
+            </div>
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+              ⚠️ Note: Use Safari browser for this feature. Chrome on iOS doesn't support Home Screen apps.
+            </p>
+          </div>
+        )}
+
+        {/* iOS version too old */}
+        {iosInfo?.isIOS && iosInfo.version < 16 && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
+            <p className="text-sm text-destructive">
+              iOS 16.4 or later is required for push notifications. Please update your device.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <p className="font-medium text-foreground">Enable Notifications</p>
@@ -70,9 +110,9 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
               onClick={requestPermission}
               size="sm"
               className="rounded-xl"
-              disabled={!isSupported}
+              disabled={!isSupported && !needsHomeScreenInstall}
             >
-              Enable
+              {needsHomeScreenInstall ? 'How to Enable' : 'Enable'}
             </Button>
           )}
         </div>
@@ -88,7 +128,7 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
           </Button>
         )}
 
-        {!isSupported && (
+        {!isSupported && !iosInfo?.isIOS && (
           <p className="text-xs text-muted-foreground">
             Push notifications are not supported in this browser.
           </p>

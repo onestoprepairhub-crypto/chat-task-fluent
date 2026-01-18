@@ -3,21 +3,70 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
+const isIOS = () => {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+};
+
+const isStandalone = () => {
+  return (window.matchMedia('(display-mode: standalone)').matches) || 
+    ((window.navigator as any).standalone === true);
+};
+
+const getIOSVersion = () => {
+  const match = navigator.userAgent.match(/OS (\d+)_/);
+  return match ? parseInt(match[1], 10) : 0;
+};
+
 export const useNotifications = () => {
   const [permissionStatus, setPermissionStatus] = useState<NotificationPermission>('default');
   const [isSupported, setIsSupported] = useState(false);
+  const [iosInfo, setIosInfo] = useState<{ isIOS: boolean; isStandalone: boolean; version: number } | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
+    const iosDevice = isIOS();
+    const standalone = isStandalone();
+    const version = getIOSVersion();
+    
+    setIosInfo({ isIOS: iosDevice, isStandalone: standalone, version });
+
     // Check if notifications are supported
     if ('Notification' in window) {
-      setIsSupported(true);
-      setPermissionStatus(Notification.permission);
+      // iOS Safari 16.4+ supports notifications only in standalone (PWA) mode
+      if (iosDevice) {
+        if (version >= 16 && standalone) {
+          setIsSupported(true);
+          setPermissionStatus(Notification.permission);
+        } else {
+          setIsSupported(false);
+        }
+      } else {
+        setIsSupported(true);
+        setPermissionStatus(Notification.permission);
+      }
     }
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (iosInfo?.isIOS && !iosInfo.isStandalone) {
+      if (iosInfo.version < 16) {
+        toast({
+          title: 'Update Required',
+          description: 'Push notifications require iOS 16.4 or later. Please update your device.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Add to Home Screen',
+          description: 'To enable notifications on iOS, tap the Share button and select "Add to Home Screen", then open the app from there.',
+          duration: 8000,
+        });
+      }
+      return false;
+    }
+
     if (!isSupported) {
       toast({
         title: 'Not Supported',
@@ -55,7 +104,7 @@ export const useNotifications = () => {
       });
       return false;
     }
-  }, [isSupported, toast]);
+  }, [isSupported, iosInfo, toast]);
 
   const showNotification = useCallback((title: string, options?: NotificationOptions) => {
     if (permissionStatus !== 'granted') {
@@ -93,6 +142,8 @@ export const useNotifications = () => {
     });
   }, [permissionStatus, showNotification, toast]);
 
+  const needsHomeScreenInstall = iosInfo?.isIOS && !iosInfo.isStandalone && iosInfo.version >= 16;
+
   return {
     permissionStatus,
     isSupported,
@@ -100,5 +151,7 @@ export const useNotifications = () => {
     requestPermission,
     showNotification,
     sendTestNotification,
+    iosInfo,
+    needsHomeScreenInstall,
   };
 };
