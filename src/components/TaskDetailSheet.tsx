@@ -139,7 +139,7 @@ export const TaskDetailSheet = ({
     ...task,
     title: task?.title || '',
     taskType: task?.taskType || 'general',
-    repeatRule: task?.repeatRule || '',
+    repeatRule: task?.repeatRule || 'none',
     priority: task?.priority || 'medium',
     reminderTimes: Array.isArray(task?.reminderTimes) ? task.reminderTimes : [],
     startDate: task?.startDate || '',

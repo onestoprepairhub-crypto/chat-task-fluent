@@ -23,7 +23,7 @@ export const TASK_TYPES = [
 ] as const;
 
 export const REPEAT_RULES = [
-  { value: '', label: 'No repeat' },
+  { value: 'none', label: 'No repeat' },
   { value: 'daily', label: 'Daily' },
   { value: 'weekdays', label: 'Weekdays (Mon-Fri)' },
   { value: 'weekends', label: 'Weekends (Sat-Sun)' },
@@ -120,7 +120,7 @@ export const useTasks = () => {
         startDate: t.start_date,
         endDate: t.end_date,
         reminderTimes: t.reminder_times || [],
-        repeatRule: (t.repeat_rule || '') as RepeatRule,
+        repeatRule: (t.repeat_rule || 'none') as RepeatRule,
         status: t.status as Task['status'],
         createdAt: t.created_at,
         nextReminder: t.next_reminder ? formatNextReminder(t.next_reminder) : undefined,
@@ -233,7 +233,7 @@ export const useTasks = () => {
         startDate: data.start_date,
         endDate: data.end_date,
         reminderTimes: data.reminder_times || [],
-        repeatRule: (data.repeat_rule || '') as RepeatRule,
+        repeatRule: (data.repeat_rule || 'none') as RepeatRule,
         status: data.status as Task['status'],
         createdAt: data.created_at,
         nextReminder: data.next_reminder ? formatNextReminder(data.next_reminder) : undefined,
@@ -384,7 +384,7 @@ export const useTasks = () => {
       
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.taskType !== undefined) dbUpdates.task_type = updates.taskType;
-      if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule || null;
+      if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule === 'none' ? null : updates.repeatRule;
       if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
       if (updates.estimatedMinutes !== undefined) dbUpdates.estimated_minutes = updates.estimatedMinutes || null;
       
