@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Bell, Clock, Moon, Smartphone } from 'lucide-react';
+import { Bell, Clock, Moon, Smartphone, LogOut } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Button } from '@/components/ui/button';
 
 interface SettingsState {
   dailySummary: boolean;
@@ -10,7 +11,11 @@ interface SettingsState {
   quietEnd: string;
 }
 
-export const SettingsView = () => {
+interface SettingsViewProps {
+  onSignOut?: () => void;
+}
+
+export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
   const [settings, setSettings] = useState<SettingsState>({
     dailySummary: true,
     defaultSnooze: 30,
@@ -137,10 +142,22 @@ export const SettingsView = () => {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Push Notifications</span>
-            <span className="text-success">Enabled</span>
+            <span className="text-success">Ready</span>
           </div>
         </div>
       </div>
+
+      {/* Sign Out */}
+      {onSignOut && (
+        <Button
+          onClick={onSignOut}
+          variant="outline"
+          className="w-full h-12 rounded-xl border-destructive text-destructive hover:bg-destructive/10"
+        >
+          <LogOut className="w-4 h-4 mr-2" />
+          Sign Out
+        </Button>
+      )}
     </div>
   );
 };

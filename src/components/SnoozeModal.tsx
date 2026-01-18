@@ -1,6 +1,10 @@
 import { X, Clock } from 'lucide-react';
-import { SnoozeOption } from '@/types/task';
 import { cn } from '@/lib/utils';
+
+interface SnoozeOption {
+  label: string;
+  minutes: number;
+}
 
 interface SnoozeModalProps {
   onSelect: (minutes: number) => void;
