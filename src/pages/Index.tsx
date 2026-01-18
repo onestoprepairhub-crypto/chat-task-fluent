@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTasks, ParsedTask, Task } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
 import { useNotificationScheduler } from '@/hooks/useNotificationScheduler';
+import { useLocationReminder } from '@/hooks/useLocationReminder';
 import { TaskInput } from '@/components/TaskInput';
 import { TaskList } from '@/components/TaskList';
 import { BottomNav, NavTab } from '@/components/BottomNav';
@@ -10,8 +11,11 @@ import { ParsePreviewModal } from '@/components/ParsePreviewModal';
 import { SnoozeModal } from '@/components/SnoozeModal';
 import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { SettingsView } from '@/components/SettingsView';
-import { Loader2, LogOut } from 'lucide-react';
+import { TaskFilters, TaskFiltersState, filterTasks } from '@/components/TaskFilters';
+import { CalendarView } from '@/components/CalendarView';
+import { Loader2, Calendar } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { user, isLoading: authLoading, signOut, isAuthenticated } = useAuth();
@@ -22,8 +26,16 @@ const Index = () => {
   } | null>(null);
   const [snoozeTaskId, setSnoozeTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [filters, setFilters] = useState<TaskFiltersState>({
+    searchQuery: '',
+    priorities: [],
+    taskTypes: [],
+    hasLocation: null,
+  });
 
   const {
+    tasks,
     activeTasks,
     completedTasks,
     isLoading,
@@ -42,6 +54,9 @@ const Index = () => {
     onComplete: completeTask,
     onSnooze: snoozeTask,
   });
+
+  // Set up location-based reminders
+  useLocationReminder({ tasks: activeTasks });
 
   // Redirect to auth if not logged in
   if (!authLoading && !isAuthenticated) {
@@ -87,6 +102,10 @@ const Index = () => {
     return 'Good evening';
   };
 
+  // Apply filters to tasks
+  const filteredActiveTasks = filterTasks(activeTasks, filters);
+  const filteredCompletedTasks = filterTasks(completedTasks, filters);
+
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
@@ -96,18 +115,46 @@ const Index = () => {
               title={getGreeting()}
               subtitle={`${activeTasks.length} active task${activeTasks.length !== 1 ? 's' : ''}`}
             />
-            <div className="px-4">
+            <div className="px-4 space-y-4">
+              {/* Search/Filter and Calendar Toggle */}
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <TaskFilters filters={filters} onFiltersChange={setFilters} />
+                </div>
+                <Button
+                  variant={showCalendar ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setShowCalendar(!showCalendar)}
+                  className="h-11 w-11 rounded-xl flex-shrink-0"
+                >
+                  <Calendar className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Content */}
               {isFetching ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : (
-                <TaskList
-                  tasks={activeTasks}
-                  onComplete={completeTask}
-                  onSnooze={(id) => setSnoozeTaskId(id)}
+              ) : showCalendar ? (
+                <CalendarView
+                  tasks={tasks}
                   onTaskClick={setSelectedTask}
                 />
+              ) : (
+                <>
+                  {filteredActiveTasks.length !== activeTasks.length && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing {filteredActiveTasks.length} of {activeTasks.length} tasks
+                    </p>
+                  )}
+                  <TaskList
+                    tasks={filteredActiveTasks}
+                    onComplete={completeTask}
+                    onSnooze={(id) => setSnoozeTaskId(id)}
+                    onTaskClick={setSelectedTask}
+                  />
+                </>
               )}
             </div>
             <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
@@ -117,19 +164,28 @@ const Index = () => {
         return (
           <>
             <Header title="Completed" subtitle="Tasks you've finished" />
-            <div className="px-4 pb-24">
+            <div className="px-4 pb-24 space-y-4">
+              <TaskFilters filters={filters} onFiltersChange={setFilters} />
+              
               {isFetching ? (
                 <div className="flex items-center justify-center py-16">
                   <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <TaskList
-                  tasks={completedTasks}
-                  onComplete={completeTask}
-                  onSnooze={(id) => setSnoozeTaskId(id)}
-                  onTaskClick={setSelectedTask}
-                  showCompleted
-                />
+                <>
+                  {filteredCompletedTasks.length !== completedTasks.length && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing {filteredCompletedTasks.length} of {completedTasks.length} tasks
+                    </p>
+                  )}
+                  <TaskList
+                    tasks={filteredCompletedTasks}
+                    onComplete={completeTask}
+                    onSnooze={(id) => setSnoozeTaskId(id)}
+                    onTaskClick={setSelectedTask}
+                    showCompleted
+                  />
+                </>
               )}
             </div>
           </>
