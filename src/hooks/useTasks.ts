@@ -466,23 +466,20 @@ function formatNextReminder(isoString: string): string {
   // Parse the UTC time
   const utcDate = new Date(isoString);
   
-  // Convert to IST for display
-  const istTime = utcDate.getTime() + (IST_OFFSET_MINUTES * 60 * 1000);
-  const istDate = new Date(istTime);
+  // Get today and tomorrow in IST for comparison
+  const nowIST = new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  const reminderDateIST = utcDate.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
   
-  // Get "now" in IST for comparison
-  const now = new Date();
-  const nowUTC = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
-  const nowIST = new Date(nowUTC + (IST_OFFSET_MINUTES * 60 * 1000));
-  
-  // Compare dates in IST
-  const isToday = istDate.toDateString() === nowIST.toDateString();
-  const tomorrow = new Date(nowIST);
+  // Calculate tomorrow's date in IST
+  const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const isTomorrow = istDate.toDateString() === tomorrow.toDateString();
+  const tomorrowIST = tomorrow.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
+  
+  const isToday = reminderDateIST === nowIST;
+  const isTomorrow = reminderDateIST === tomorrowIST;
 
-  // Format time in IST
-  const timeStr = istDate.toLocaleTimeString('en-IN', {
+  // Format time in IST - use toLocaleTimeString which handles timezone conversion
+  const timeStr = utcDate.toLocaleTimeString('en-IN', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -491,7 +488,7 @@ function formatNextReminder(isoString: string): string {
 
   if (isToday) return `Today, ${timeStr}`;
   if (isTomorrow) return `Tomorrow, ${timeStr}`;
-  return `${istDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}, ${timeStr}`;
+  return `${utcDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}, ${timeStr}`;
 }
 
 // IST offset: UTC+5:30 = 330 minutes

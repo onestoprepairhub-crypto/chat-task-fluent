@@ -219,16 +219,21 @@ IMPORTANT RULES:
     }
 
     // Convert reminder times to ISO format for consistent storage
+    console.log("Raw reminder times from AI:", parsedTask.reminder_times);
+    console.log("Start date for conversion:", parsedTask.start_date);
+    
     const convertedReminderTimes = parsedTask.reminder_times.map((time: string) => {
       // If already ISO format, return as-is
       if (time.includes('T')) {
+        console.log("Time already in ISO format:", time);
         return time;
       }
       
-      // Parse time like "9:00 AM"
+      // Parse time like "9:00 AM" or "10:05 AM"
       const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
       if (!match) {
-        // Default to 9 AM
+        console.log("Could not parse time, using default:", time);
+        // Default to 9 AM IST
         const defaultDate = new Date(`${parsedTask.start_date}T09:00:00+05:30`);
         return defaultDate.toISOString();
       }
@@ -237,20 +242,28 @@ IMPORTANT RULES:
       const minutes = parseInt(match[2]);
       const isPM = match[3].toUpperCase() === 'PM';
       
+      console.log(`Parsed time: ${hours}:${minutes} ${isPM ? 'PM' : 'AM'}`);
+      
       if (isPM && hours !== 12) hours += 12;
       if (!isPM && hours === 12) hours = 0;
+      
+      console.log(`Converted to 24hr: ${hours}:${minutes}`);
       
       // Create IST date string and convert to UTC
       const hoursStr = hours.toString().padStart(2, '0');
       const minsStr = minutes.toString().padStart(2, '0');
       const istDateStr = `${parsedTask.start_date}T${hoursStr}:${minsStr}:00+05:30`;
-      const date = new Date(istDateStr);
+      console.log("IST date string:", istDateStr);
       
-      return date.toISOString();
+      const date = new Date(istDateStr);
+      const isoString = date.toISOString();
+      console.log("Converted to UTC ISO:", isoString);
+      
+      return isoString;
     });
     
     parsedTask.reminder_times = convertedReminderTimes;
-    console.log("Converted reminder times to ISO:", convertedReminderTimes);
+    console.log("Final converted reminder times:", convertedReminderTimes);
 
     return new Response(
       JSON.stringify(parsedTask),
