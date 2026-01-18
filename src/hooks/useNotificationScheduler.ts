@@ -86,80 +86,51 @@ export const useNotificationScheduler = ({
     }
 
     const now = new Date();
-    const istNow = nowIST();
-    console.log('[NotificationScheduler] Checking tasks at:', now.toISOString(), 'IST:', istNow.toISOString());
+    console.log('[NotificationScheduler] Checking tasks at:', now.toISOString());
     
     const activeTasks = tasks.filter(
       (t) => t.status === 'active' || t.status === 'snoozed'
     );
 
     activeTasks.forEach((task) => {
-      // Check reminder_times array for time-based reminders
+      // Check reminder_times array - all should be ISO format now
       if (task.reminderTimes && task.reminderTimes.length > 0) {
         task.reminderTimes.forEach((reminderTime) => {
-          let reminderDate: Date | null = null;
+          // All reminder times should now be in ISO format
+          const reminderDate = new Date(reminderTime);
 
-          // Check if it's an ISO date string
-          if (reminderTime.includes('T') || reminderTime.includes('-')) {
-            reminderDate = new Date(reminderTime);
-          } else {
-            // Parse simple time format like "9:20 AM"
-            const timeMatch = reminderTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-            if (timeMatch) {
-              let hours = parseInt(timeMatch[1]);
-              const minutes = parseInt(timeMatch[2]);
-              const isPM = timeMatch[3].toUpperCase() === 'PM';
-              
-              if (isPM && hours !== 12) hours += 12;
-              if (!isPM && hours === 12) hours = 0;
-              
-              reminderDate = new Date();
-              reminderDate.setHours(hours, minutes, 0, 0);
-            }
-          }
-
-          if (!reminderDate || isNaN(reminderDate.getTime())) {
+          if (isNaN(reminderDate.getTime())) {
+            console.log('[NotificationScheduler] Invalid reminder time:', reminderTime);
             return;
           }
 
           const timeDiff = reminderDate.getTime() - now.getTime();
           const taskKey = `${task.id}-${reminderDate.getTime()}`;
 
-          // Check if it's time to notify (within 2 minute window)
+          // Log for debugging
+          console.log(`[NotificationScheduler] Task "${task.title}" reminder: ${reminderTime}, diff: ${Math.round(timeDiff/1000)}s`);
+
+          // Check if it's time to notify (within 2 minute window before and 1 minute after)
           if (timeDiff >= -120000 && timeDiff <= 60000 && !notifiedTasksRef.current.has(taskKey)) {
-            console.log(`[NotificationScheduler] Triggering notification for: ${task.title}`);
+            console.log(`[NotificationScheduler] TRIGGERING notification for: ${task.title}`);
             notifiedTasksRef.current.add(taskKey);
             triggerNotification(task);
           }
         });
       }
 
-      // Also check next_reminder field
+      // Also check next_reminder field as backup
       if (task.nextReminder) {
-        let reminderDate: Date | null = null;
-
-        if (task.nextReminder.includes('T') || task.nextReminder.match(/^\d{4}-\d{2}-\d{2}/)) {
-          reminderDate = new Date(task.nextReminder);
-        }
-
-        if (reminderDate && !isNaN(reminderDate.getTime())) {
-          const timeDiff = reminderDate.getTime() - now.getTime();
-          const taskKey = `${task.id}-next-${reminderDate.getTime()}`;
-
-          if (timeDiff >= -120000 && timeDiff <= 60000 && !notifiedTasksRef.current.has(taskKey)) {
-            console.log(`[NotificationScheduler] Triggering notification for next_reminder: ${task.title}`);
-            notifiedTasksRef.current.add(taskKey);
-            triggerNotification(task);
-          }
-        }
+        // nextReminder is formatted for display, we need to check the raw value
+        // Skip this check as reminder_times now contains the proper ISO dates
       }
 
       // Pre-alert for meetings (15 min before)
       if (task.taskType === 'meeting' || task.taskType === 'call') {
         task.reminderTimes.forEach((reminderTime) => {
-          if (!reminderTime.includes('T')) return;
-          
           const meetingDate = new Date(reminderTime);
+          if (isNaN(meetingDate.getTime())) return;
+          
           const preAlertTime = meetingDate.getTime() - 15 * 60 * 1000; // 15 min before
           const timeDiff = preAlertTime - now.getTime();
           const preAlertKey = `${task.id}-prealert-${meetingDate.getTime()}`;
@@ -238,9 +209,9 @@ export const useNotificationScheduler = ({
 
       // Check if task has a past reminder that wasn't completed
       task.reminderTimes.forEach((reminderTime) => {
-        if (!reminderTime.includes('T')) return;
-        
         const reminderDate = new Date(reminderTime);
+        if (isNaN(reminderDate.getTime())) return;
+        
         const hoursSinceReminder = (now.getTime() - reminderDate.getTime()) / (1000 * 60 * 60);
         
         // Send follow-up 1 hour after missed reminder

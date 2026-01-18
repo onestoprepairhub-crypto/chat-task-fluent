@@ -196,6 +196,40 @@ IMPORTANT RULES:
       parsedTask.priority = "medium";
     }
 
+    // Convert reminder times to ISO format for consistent storage
+    const convertedReminderTimes = parsedTask.reminder_times.map((time: string) => {
+      // If already ISO format, return as-is
+      if (time.includes('T')) {
+        return time;
+      }
+      
+      // Parse time like "9:00 AM"
+      const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) {
+        // Default to 9 AM
+        const defaultDate = new Date(`${parsedTask.start_date}T09:00:00+05:30`);
+        return defaultDate.toISOString();
+      }
+      
+      let hours = parseInt(match[1]);
+      const minutes = parseInt(match[2]);
+      const isPM = match[3].toUpperCase() === 'PM';
+      
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+      
+      // Create IST date string and convert to UTC
+      const hoursStr = hours.toString().padStart(2, '0');
+      const minsStr = minutes.toString().padStart(2, '0');
+      const istDateStr = `${parsedTask.start_date}T${hoursStr}:${minsStr}:00+05:30`;
+      const date = new Date(istDateStr);
+      
+      return date.toISOString();
+    });
+    
+    parsedTask.reminder_times = convertedReminderTimes;
+    console.log("Converted reminder times to ISO:", convertedReminderTimes);
+
     return new Response(
       JSON.stringify(parsedTask),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
