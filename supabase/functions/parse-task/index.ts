@@ -31,15 +31,20 @@ serve(async (req) => {
 
     // Get today's date in IST (UTC+5:30)
     const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in ms
+    const istOffset = 5.5 * 60 * 60 * 1000;
     const istTime = new Date(now.getTime() + istOffset);
     const today = istTime.toISOString().split('T')[0];
+    const currentHour = istTime.getUTCHours();
     
     // Calculate tomorrow in IST
     const tomorrowIST = new Date(istTime.getTime() + 24 * 60 * 60 * 1000);
     const tomorrow = tomorrowIST.toISOString().split('T')[0];
     
-    console.log("Today (IST):", today, "Tomorrow (IST):", tomorrow);
+    // Calculate next week
+    const nextWeekIST = new Date(istTime.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const nextWeek = nextWeekIST.toISOString().split('T')[0];
+    
+    console.log("Today (IST):", today, "Tomorrow (IST):", tomorrow, "Current hour:", currentHour);
     
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -52,19 +57,42 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a task parsing assistant. Today's date is ${today} and tomorrow is ${tomorrow}. All dates are in Indian Standard Time (IST). Extract structured task information from natural language input. Be smart about interpreting dates, times, and task types.
+            content: `You are a task parsing assistant. Today's date is ${today}, tomorrow is ${tomorrow}, and next week starts ${nextWeek}. Current hour in IST is ${currentHour}:00. All dates are in Indian Standard Time (IST). Extract structured task information from natural language input.
 
-When parsing:
-- "today" means ${today}
-- "tomorrow" means ${tomorrow}
-- "next week" means 7 days from today  
-- Times like "8am", "8 am", "8:00am" should be formatted as "8:00 AM"
-- Times like "9:30 am" should be formatted as "9:30 AM"
-- If no specific time is mentioned, default to "9:00 AM"
-- If user mentions multiple reminder times, extract all of them
-- Detect task type: 'meeting' for meetings/calls, 'deadline' for due dates, 'recurring' for daily/weekly tasks, 'one-time' for single reminders
-- For recurring tasks, extract the repeat_rule (daily, weekly, monthly)
-- IMPORTANT: Always set start_date when a date like "today" or "tomorrow" is mentioned`
+SMART TIME DEFAULTS (use these when specific time not mentioned):
+- "morning" → "9:00 AM"
+- "afternoon" → "2:00 PM"  
+- "evening" → "6:00 PM"
+- "night" or "tonight" → "9:00 PM"
+- "lunch" or "lunchtime" → "1:00 PM"
+- "end of day" or "EOD" → "6:00 PM"
+- No time specified → default based on context:
+  - For meetings/calls: "10:00 AM"
+  - For reminders: "9:00 AM"
+  - For deadlines: "6:00 PM" (end of day)
+
+DATE PARSING:
+- "today" → ${today}
+- "tomorrow" → ${tomorrow}
+- "day after tomorrow" → day after ${tomorrow}
+- "next week" → ${nextWeek}
+- "this weekend" → upcoming Saturday
+- "monday", "tuesday", etc. → next occurrence of that day
+
+TASK TYPE DETECTION:
+- 'call' for phone calls, calling someone
+- 'meeting' for meetings, appointments
+- 'deadline' for due dates, submissions, payments
+- 'recurring' for daily/weekly/monthly tasks
+- 'email' for sending emails
+- 'reminder' for general reminders
+- 'one-time' for single tasks
+
+IMPORTANT RULES:
+1. Always set start_date when any date reference is found
+2. For tasks with dates but no times, use smart defaults above
+3. Extract the clean task title without date/time words
+4. For recurring tasks, set repeat_rule appropriately`
           },
           {
             role: "user",
@@ -82,16 +110,16 @@ When parsing:
                 properties: {
                   task_title: {
                     type: "string",
-                    description: "A clean, concise title for the task"
+                    description: "A clean, concise title for the task (without date/time words)"
                   },
                   task_type: {
                     type: "string",
-                    enum: ["deadline", "meeting", "one-time", "recurring"],
+                    enum: ["deadline", "meeting", "one-time", "recurring", "call", "email", "reminder"],
                     description: "The type of task"
                   },
                   start_date: {
                     type: "string",
-                    description: "Start date in YYYY-MM-DD format, or null if not specified"
+                    description: "Start date in YYYY-MM-DD format. REQUIRED when any date is mentioned."
                   },
                   end_date: {
                     type: "string",
@@ -100,15 +128,20 @@ When parsing:
                   reminder_times: {
                     type: "array",
                     items: { type: "string" },
-                    description: "Array of reminder times in format like '9:00 AM', '2:30 PM'"
+                    description: "Array of reminder times in format like '9:00 AM', '2:30 PM'. Use smart defaults."
                   },
                   repeat_rule: {
                     type: "string",
-                    enum: ["daily", "weekly", "monthly", null],
+                    enum: ["daily", "weekly", "monthly", ""],
                     description: "Repeat rule for recurring tasks"
+                  },
+                  priority: {
+                    type: "string",
+                    enum: ["low", "medium", "high", "urgent"],
+                    description: "Priority level. Default to 'medium'. Use 'high' for important/urgent keywords, 'urgent' for ASAP/critical."
                   }
                 },
-                required: ["task_title", "task_type", "reminder_times"],
+                required: ["task_title", "task_type", "reminder_times", "start_date"],
                 additionalProperties: false
               }
             }
@@ -151,6 +184,16 @@ When parsing:
     // Ensure reminder_times is always an array
     if (!parsedTask.reminder_times || !Array.isArray(parsedTask.reminder_times)) {
       parsedTask.reminder_times = ["9:00 AM"];
+    }
+
+    // Ensure start_date defaults to today if not set
+    if (!parsedTask.start_date) {
+      parsedTask.start_date = today;
+    }
+
+    // Default priority if not set
+    if (!parsedTask.priority) {
+      parsedTask.priority = "medium";
     }
 
     return new Response(
