@@ -193,10 +193,15 @@ export const TaskDetailSheet = ({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
-        <div className="glass-card w-full max-w-lg mx-4 mb-4 animate-slide-up max-h-[85vh] overflow-y-auto">
+      <div 
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div className="bg-card w-full max-w-lg mx-0 sm:mx-4 rounded-t-2xl sm:rounded-2xl shadow-2xl border border-border max-h-[90vh] overflow-hidden flex flex-col animate-slide-up">
           {/* Header */}
-          <div className="sticky top-0 bg-card/95 backdrop-blur-xl p-4 border-b border-border flex items-center justify-between">
+          <div className="sticky top-0 bg-card p-4 border-b border-border flex items-center justify-between z-10">
             <h2 className="text-lg font-semibold text-foreground">Edit Task</h2>
             <button
               onClick={onClose}
@@ -206,8 +211,8 @@ export const TaskDetailSheet = ({
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-5 space-y-5">
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-5">
             {/* Title */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">
@@ -468,8 +473,8 @@ export const TaskDetailSheet = ({
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="p-5 pt-0 space-y-3">
+          {/* Actions - Fixed at bottom */}
+          <div className="p-4 border-t border-border bg-card space-y-3">
             {hasChanges && (
               <Button
                 onClick={handleSave}
