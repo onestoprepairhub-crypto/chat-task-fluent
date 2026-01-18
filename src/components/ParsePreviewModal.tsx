@@ -9,22 +9,49 @@ interface ParsePreviewModalProps {
   onCancel: () => void;
 }
 
+// Format ISO UTC time to IST display
+const formatReminderIST = (isoString: string): string => {
+  // Check if it's an ISO string
+  if (!isoString.includes('T')) {
+    return isoString; // Return as-is if not ISO format
+  }
+  
+  const utcDate = new Date(isoString);
+  if (isNaN(utcDate.getTime())) {
+    return isoString;
+  }
+  
+  // Format in IST timezone
+  return utcDate.toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+};
+
 export const ParsePreviewModal = ({
   parsedTask,
   originalInput,
   onConfirm,
   onCancel,
 }: ParsePreviewModalProps) => {
-  const getTypeLabel = (type: ParsedTask['task_type']) => {
+  const getTypeLabel = (type: string) => {
     switch (type) {
       case 'deadline': return 'Deadline Task';
       case 'meeting': return 'Meeting';
       case 'recurring': return 'Recurring Task';
+      case 'call': return 'Call';
+      case 'email': return 'Email';
+      case 'reminder': return 'Reminder';
       default: return 'One-time Task';
     }
   };
 
-  const getTypeIcon = (type: ParsedTask['task_type']) => {
+  const getTypeIcon = (type: string) => {
     switch (type) {
       case 'meeting': return <Calendar className="w-4 h-4" />;
       case 'recurring': return <RefreshCw className="w-4 h-4" />;
@@ -32,6 +59,9 @@ export const ParsePreviewModal = ({
       default: return <Bell className="w-4 h-4" />;
     }
   };
+
+  // Format reminders for display in IST
+  const formattedReminders = parsedTask.reminder_times.map(formatReminderIST);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
@@ -65,16 +95,40 @@ export const ParsePreviewModal = ({
               <span className="text-sm text-foreground">{getTypeLabel(parsedTask.task_type)}</span>
             </div>
 
-            {parsedTask.end_date && (
+            {parsedTask.start_date && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
-                <span>Due: {parsedTask.end_date}</span>
+                <span>Date: {new Date(parsedTask.start_date + 'T00:00:00').toLocaleDateString('en-IN', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric',
+                  timeZone: 'Asia/Kolkata'
+                })}</span>
               </div>
             )}
 
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Bell className="w-4 h-4" />
-              <span>Reminders: {parsedTask.reminder_times.join(', ')}</span>
+            {parsedTask.end_date && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Clock className="w-4 h-4" />
+                <span>Due: {new Date(parsedTask.end_date + 'T00:00:00').toLocaleDateString('en-IN', { 
+                  day: 'numeric', 
+                  month: 'short', 
+                  year: 'numeric',
+                  timeZone: 'Asia/Kolkata'
+                })}</span>
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+              <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="font-medium text-foreground">Reminders (IST):</span>
+                <div className="mt-1 space-y-1">
+                  {formattedReminders.map((reminder, idx) => (
+                    <div key={idx} className="text-foreground">{reminder}</div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {parsedTask.repeat_rule && (
