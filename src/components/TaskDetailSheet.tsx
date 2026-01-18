@@ -1,11 +1,58 @@
-import { useState } from 'react';
-import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, Flag, Timer, MapPin, Map } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, Flag, Timer, MapPin, Map, Plus } from 'lucide-react';
 import { Task, TASK_TYPES, REPEAT_RULES, PRIORITY_LEVELS, TIME_ESTIMATES, TaskType, RepeatRule, Priority, TaskLocation } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LocationPicker } from '@/components/LocationPicker';
 import { cn } from '@/lib/utils';
+
+interface ReminderDateTime {
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM (24-hour format for input)
+}
+
+// Parse reminder string like "9:00 AM" or "2025-01-18T09:00:00" into ReminderDateTime
+function parseReminderToDateTime(reminder: string, defaultDate: string): ReminderDateTime {
+  // Check if it's an ISO string
+  if (reminder.includes('T') || reminder.includes('-')) {
+    const date = new Date(reminder);
+    if (!isNaN(date.getTime())) {
+      return {
+        date: date.toISOString().split('T')[0],
+        time: date.toTimeString().slice(0, 5),
+      };
+    }
+  }
+  
+  // Parse time like "9:00 AM" or "2:30 PM"
+  const match = reminder.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+  if (match) {
+    let hours = parseInt(match[1]);
+    const minutes = match[2];
+    const period = match[3]?.toUpperCase();
+    
+    if (period === 'PM' && hours !== 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    
+    return {
+      date: defaultDate || new Date().toISOString().split('T')[0],
+      time: `${hours.toString().padStart(2, '0')}:${minutes}`,
+    };
+  }
+  
+  // Default to 9 AM on the given date
+  return {
+    date: defaultDate || new Date().toISOString().split('T')[0],
+    time: '09:00',
+  };
+}
+
+// Format ReminderDateTime back to display string
+function formatReminderDateTime(reminder: ReminderDateTime): string {
+  const date = new Date(`${reminder.date}T${reminder.time}:00`);
+  return date.toISOString();
+}
 
 interface TaskDetailSheetProps {
   task: Task;
@@ -42,8 +89,8 @@ export const TaskDetailSheet = ({
   onComplete,
 }: TaskDetailSheetProps) => {
   const [title, setTitle] = useState(task.title);
+  const [startDate, setStartDate] = useState(task.startDate || '');
   const [endDate, setEndDate] = useState(task.endDate || '');
-  const [reminderTimes, setReminderTimes] = useState(task.reminderTimes.join(', '));
   const [taskType, setTaskType] = useState<TaskType>(task.taskType || 'general');
   const [repeatRule, setRepeatRule] = useState<RepeatRule>(task.repeatRule || '');
   const [priority, setPriority] = useState<Priority>(task.priority || 'medium');
@@ -51,6 +98,15 @@ export const TaskDetailSheet = ({
   const [location, setLocation] = useState<TaskLocation | undefined>(task.location);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Parse existing reminder times into structured format
+  const defaultDate = startDate || endDate || new Date().toISOString().split('T')[0];
+  const [reminders, setReminders] = useState<ReminderDateTime[]>(() => {
+    if (task.reminderTimes.length === 0) {
+      return [{ date: defaultDate, time: '09:00' }];
+    }
+    return task.reminderTimes.map(r => parseReminderToDateTime(r, defaultDate));
+  });
 
   const handleChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setter(e.target.value);
@@ -62,11 +118,36 @@ export const TaskDetailSheet = ({
     setHasChanges(true);
   };
 
+  const handleReminderChange = (index: number, field: 'date' | 'time', value: string) => {
+    setReminders(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+    setHasChanges(true);
+  };
+
+  const addReminder = () => {
+    setReminders(prev => [...prev, { date: defaultDate, time: '09:00' }]);
+    setHasChanges(true);
+  };
+
+  const removeReminder = (index: number) => {
+    if (reminders.length > 1) {
+      setReminders(prev => prev.filter((_, i) => i !== index));
+      setHasChanges(true);
+    }
+  };
+
   const handleSave = () => {
+    // Convert structured reminders to ISO strings for storage
+    const reminderTimesISO = reminders.map(r => formatReminderDateTime(r));
+    
     onUpdate(task.id, {
       title,
+      startDate: startDate || undefined,
       endDate: endDate || undefined,
-      reminderTimes: reminderTimes.split(',').map(t => t.trim()).filter(Boolean),
+      reminderTimes: reminderTimesISO,
       taskType,
       repeatRule: repeatRule || undefined,
       priority,
@@ -225,7 +306,24 @@ export const TaskDetailSheet = ({
               </Select>
             </div>
 
-            {/* End Date */}
+            {/* Start Date */}
+            <div>
+              <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Start Date
+              </label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setHasChanges(true);
+                }}
+                className="h-12 rounded-xl"
+              />
+            </div>
+
+            {/* End Date / Due Date */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
@@ -239,20 +337,53 @@ export const TaskDetailSheet = ({
               />
             </div>
 
-            {/* Reminder Times */}
+            {/* Reminder Date & Time */}
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                 <Bell className="w-4 h-4" />
-                Reminder Times (IST)
+                Reminders (IST)
               </label>
-              <Input
-                value={reminderTimes}
-                onChange={handleChange(setReminderTimes)}
-                placeholder="9:00 AM, 2:00 PM"
-                className="h-12 rounded-xl"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Times are in Indian Standard Time (IST). Separate multiple times with commas.
+              <div className="space-y-3">
+                {reminders.map((reminder, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <Input
+                      type="date"
+                      value={reminder.date}
+                      onChange={(e) => handleReminderChange(index, 'date', e.target.value)}
+                      className="h-12 rounded-xl flex-1"
+                    />
+                    <Input
+                      type="time"
+                      value={reminder.time}
+                      onChange={(e) => handleReminderChange(index, 'time', e.target.value)}
+                      className="h-12 rounded-xl w-32"
+                    />
+                    {reminders.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeReminder(index)}
+                        className="h-10 w-10 text-destructive hover:bg-destructive/10"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addReminder}
+                  className="w-full rounded-xl"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Another Reminder
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Set exact date & time for each reminder. All times are in IST.
               </p>
             </div>
 
