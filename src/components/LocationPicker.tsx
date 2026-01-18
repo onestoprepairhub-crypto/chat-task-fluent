@@ -334,3 +334,6 @@ export const LocationPicker = ({ value, onChange, onClose }: LocationPickerProps
     </div>
   );
 };
+
+// Default export for lazy loading
+export default LocationPicker;
