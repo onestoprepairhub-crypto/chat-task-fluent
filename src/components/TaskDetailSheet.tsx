@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame } from 'lucide-react';
-import { Task, TASK_TYPES, REPEAT_RULES, TaskType, RepeatRule } from '@/hooks/useTasks';
+import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, Flag, Timer, MapPin } from 'lucide-react';
+import { Task, TASK_TYPES, REPEAT_RULES, PRIORITY_LEVELS, TIME_ESTIMATES, TaskType, RepeatRule, Priority, TaskLocation } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 interface TaskDetailSheetProps {
   task: Task;
@@ -44,6 +45,13 @@ export const TaskDetailSheet = ({
   const [reminderTimes, setReminderTimes] = useState(task.reminderTimes.join(', '));
   const [taskType, setTaskType] = useState<TaskType>(task.taskType || 'general');
   const [repeatRule, setRepeatRule] = useState<RepeatRule>(task.repeatRule || '');
+  const [priority, setPriority] = useState<Priority>(task.priority || 'medium');
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | undefined>(task.estimatedMinutes);
+  const [locationName, setLocationName] = useState(task.location?.name || '');
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number; lng: number } | null>(
+    task.location ? { lat: task.location.lat, lng: task.location.lng } : null
+  );
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,14 +59,60 @@ export const TaskDetailSheet = ({
     setHasChanges(true);
   };
 
+  const getCurrentLocation = async () => {
+    if (!('geolocation' in navigator)) {
+      alert('Location is not supported in this browser');
+      return;
+    }
+
+    setIsGettingLocation(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+        });
+      });
+
+      setLocationCoords({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+      if (!locationName) {
+        setLocationName('Current Location');
+      }
+      setHasChanges(true);
+    } catch (error) {
+      console.error('Failed to get location:', error);
+      alert('Failed to get your location. Please check permissions.');
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
   const handleSave = () => {
-    onUpdate(task.id, {
+    const updates: Partial<Task> = {
       title,
       endDate: endDate || undefined,
       reminderTimes: reminderTimes.split(',').map(t => t.trim()).filter(Boolean),
       taskType,
       repeatRule: repeatRule || undefined,
-    });
+      priority,
+      estimatedMinutes,
+    };
+
+    if (locationName && locationCoords) {
+      updates.location = {
+        name: locationName,
+        lat: locationCoords.lat,
+        lng: locationCoords.lng,
+        radius: 100,
+      };
+    } else {
+      updates.location = undefined;
+    }
+
+    onUpdate(task.id, updates);
     onClose();
   };
 
@@ -95,6 +149,64 @@ export const TaskDetailSheet = ({
               onChange={handleChange(setTitle)}
               className="h-12 rounded-xl text-base"
             />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <Flag className="w-4 h-4" />
+              Priority
+            </label>
+            <div className="flex gap-2">
+              {PRIORITY_LEVELS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => {
+                    setPriority(p.value);
+                    setHasChanges(true);
+                  }}
+                  className={cn(
+                    "flex-1 py-3 rounded-xl text-sm font-medium transition-all",
+                    priority === p.value
+                      ? `${p.bg} ${p.color} ring-2 ring-offset-2 ring-offset-background`
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+                    priority === p.value && p.value === 'low' && "ring-muted-foreground",
+                    priority === p.value && p.value === 'medium' && "ring-primary",
+                    priority === p.value && p.value === 'high' && "ring-warning",
+                    priority === p.value && p.value === 'urgent' && "ring-destructive"
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Time Estimation */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <Timer className="w-4 h-4" />
+              Time Estimate
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {TIME_ESTIMATES.map((t) => (
+                <button
+                  key={t.value}
+                  onClick={() => {
+                    setEstimatedMinutes(estimatedMinutes === t.value ? undefined : t.value);
+                    setHasChanges(true);
+                  }}
+                  className={cn(
+                    "px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                    estimatedMinutes === t.value
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                  )}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Task Type */}
@@ -170,7 +282,7 @@ export const TaskDetailSheet = ({
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
               <Bell className="w-4 h-4" />
-              Reminder Times
+              Reminder Times (IST)
             </label>
             <Input
               value={reminderTimes}
@@ -179,8 +291,63 @@ export const TaskDetailSheet = ({
               className="h-12 rounded-xl"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Separate multiple times with commas
+              Times are in Indian Standard Time (IST). Separate multiple times with commas.
             </p>
+          </div>
+
+          {/* Location Reminder */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <MapPin className="w-4 h-4" />
+              Location Reminder
+            </label>
+            <div className="space-y-2">
+              <Input
+                value={locationName}
+                onChange={(e) => {
+                  setLocationName(e.target.value);
+                  setHasChanges(true);
+                }}
+                placeholder="Location name (e.g., Office, Home)"
+                className="h-12 rounded-xl"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={getCurrentLocation}
+                  disabled={isGettingLocation}
+                  className="rounded-xl flex-1"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  {isGettingLocation ? 'Getting location...' : 'Use Current Location'}
+                </Button>
+                {locationCoords && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setLocationCoords(null);
+                      setLocationName('');
+                      setHasChanges(true);
+                    }}
+                    className="rounded-xl text-destructive"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+              {locationCoords && (
+                <p className="text-xs text-muted-foreground">
+                  📍 Location set: {locationCoords.lat.toFixed(4)}, {locationCoords.lng.toFixed(4)}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                You'll be reminded when you're within 100m of this location.
+              </p>
+            </div>
           </div>
         </div>
 

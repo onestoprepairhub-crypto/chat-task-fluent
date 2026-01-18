@@ -3,11 +3,46 @@ import { Task } from '@/hooks/useTasks';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useToast } from '@/hooks/use-toast';
 
+// IST offset: UTC+5:30 = 330 minutes
+const IST_OFFSET_MINUTES = 330;
+
 interface UseNotificationSchedulerProps {
   tasks: Task[];
   onComplete: (taskId: string) => void;
   onSnooze: (taskId: string, minutes: number) => void;
 }
+
+// Convert UTC date to IST
+const toIST = (date: Date): Date => {
+  const utc = date.getTime() + date.getTimezoneOffset() * 60000;
+  return new Date(utc + IST_OFFSET_MINUTES * 60000);
+};
+
+// Get current time in IST
+const nowIST = (): Date => {
+  return toIST(new Date());
+};
+
+// Format time in IST
+export const formatTimeIST = (date: Date): string => {
+  const istDate = toIST(date);
+  return istDate.toLocaleTimeString('en-IN', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Kolkata',
+  });
+};
+
+// Format date in IST
+export const formatDateIST = (date: Date): string => {
+  const istDate = toIST(date);
+  return istDate.toLocaleDateString('en-IN', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  });
+};
 
 export const useNotificationScheduler = ({
   tasks,
@@ -22,7 +57,7 @@ export const useNotificationScheduler = ({
   const checkDueTasks = useCallback(() => {
     if (!isEnabled) return;
 
-    const now = new Date();
+    const now = nowIST();
     const activeTasks = tasks.filter(
       (t) => t.status === 'active' || t.status === 'snoozed'
     );
@@ -30,7 +65,7 @@ export const useNotificationScheduler = ({
     activeTasks.forEach((task) => {
       if (!task.nextReminder) return;
       
-      // Parse the next reminder time
+      // Parse the next reminder time (already formatted for display)
       const reminderMatch = task.nextReminder.match(
         /(?:Today|Tomorrow|([A-Za-z]+ \d+)), (\d{1,2}):(\d{2}) (AM|PM)/i
       );
@@ -40,7 +75,7 @@ export const useNotificationScheduler = ({
       let reminderDate: Date;
       
       if (task.nextReminder.startsWith('Today')) {
-        reminderDate = new Date();
+        reminderDate = new Date(now);
       } else if (task.nextReminder.startsWith('Tomorrow')) {
         reminderDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
       } else {
@@ -65,8 +100,13 @@ export const useNotificationScheduler = ({
       if (timeDiff >= 0 && timeDiff <= 60000 && !notifiedTasksRef.current.has(taskKey)) {
         notifiedTasksRef.current.add(taskKey);
         
+        // Get priority indicator
+        const priorityEmoji = task.priority === 'urgent' ? '🔴' : 
+                              task.priority === 'high' ? '🟠' : 
+                              task.priority === 'medium' ? '🟡' : '🔵';
+        
         // Show browser notification
-        const notification = showNotification(`🔔 ${task.title}`, {
+        const notification = showNotification(`${priorityEmoji} ${task.title}`, {
           body: task.endDate ? `Due: ${task.endDate}` : 'Task reminder',
           tag: task.id,
           requireInteraction: true,
@@ -81,7 +121,7 @@ export const useNotificationScheduler = ({
 
         // Also show in-app toast
         toast({
-          title: `🔔 ${task.title}`,
+          title: `${priorityEmoji} ${task.title}`,
           description: task.endDate ? `Due: ${task.endDate}` : 'Time for your reminder!',
           duration: 30000,
         });
@@ -117,4 +157,10 @@ export const useNotificationScheduler = ({
 
     return () => clearInterval(cleanup);
   }, []);
+
+  return {
+    nowIST,
+    formatTimeIST,
+    formatDateIST,
+  };
 };

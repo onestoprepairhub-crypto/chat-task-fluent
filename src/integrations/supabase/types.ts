@@ -18,8 +18,14 @@ export type Database = {
         Row: {
           created_at: string
           end_date: string | null
+          estimated_minutes: number | null
           id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_name: string | null
+          location_radius: number | null
           next_reminder: string | null
+          priority: string | null
           reminder_times: string[]
           repeat_rule: string | null
           start_date: string | null
@@ -32,8 +38,14 @@ export type Database = {
         Insert: {
           created_at?: string
           end_date?: string | null
+          estimated_minutes?: number | null
           id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          location_name?: string | null
+          location_radius?: number | null
           next_reminder?: string | null
+          priority?: string | null
           reminder_times?: string[]
           repeat_rule?: string | null
           start_date?: string | null
@@ -46,8 +58,14 @@ export type Database = {
         Update: {
           created_at?: string
           end_date?: string | null
+          estimated_minutes?: number | null
           id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          location_name?: string | null
+          location_radius?: number | null
           next_reminder?: string | null
+          priority?: string | null
           reminder_times?: string[]
           repeat_rule?: string | null
           start_date?: string | null

@@ -34,8 +34,33 @@ export const REPEAT_RULES = [
   { value: 'yearly', label: 'Yearly' },
 ] as const;
 
+export const PRIORITY_LEVELS = [
+  { value: 'low', label: 'Low', color: 'text-muted-foreground', bg: 'bg-muted' },
+  { value: 'medium', label: 'Medium', color: 'text-primary', bg: 'bg-primary/15' },
+  { value: 'high', label: 'High', color: 'text-warning', bg: 'bg-warning/15' },
+  { value: 'urgent', label: 'Urgent', color: 'text-destructive', bg: 'bg-destructive/15' },
+] as const;
+
+export const TIME_ESTIMATES = [
+  { value: 5, label: '5 min' },
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 60, label: '1 hour' },
+  { value: 120, label: '2 hours' },
+  { value: 240, label: '4 hours' },
+  { value: 480, label: '8 hours' },
+] as const;
+
 export type TaskType = typeof TASK_TYPES[number]['value'];
 export type RepeatRule = typeof REPEAT_RULES[number]['value'];
+export type Priority = typeof PRIORITY_LEVELS[number]['value'];
+
+export interface TaskLocation {
+  name: string;
+  lat: number;
+  lng: number;
+  radius: number; // meters
+}
 
 export interface Task {
   id: string;
@@ -48,6 +73,9 @@ export interface Task {
   status: 'active' | 'completed' | 'snoozed';
   createdAt: string;
   nextReminder?: string;
+  priority: Priority;
+  estimatedMinutes?: number;
+  location?: TaskLocation;
 }
 
 export interface ParsedTask {
@@ -57,6 +85,7 @@ export interface ParsedTask {
   end_date?: string;
   reminder_times: string[];
   repeat_rule?: string;
+  priority?: Priority;
 }
 
 const PARSE_TASK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-task`;
@@ -84,7 +113,7 @@ export const useTasks = () => {
 
       if (error) throw error;
 
-      const mappedTasks: Task[] = (data || []).map((t) => ({
+      const mappedTasks: Task[] = (data || []).map((t: any) => ({
         id: t.id,
         title: t.title,
         taskType: t.task_type as Task['taskType'],
@@ -95,6 +124,14 @@ export const useTasks = () => {
         status: t.status as Task['status'],
         createdAt: t.created_at,
         nextReminder: t.next_reminder ? formatNextReminder(t.next_reminder) : undefined,
+        priority: (t.priority || 'medium') as Priority,
+        estimatedMinutes: t.estimated_minutes || undefined,
+        location: t.location_name && t.location_lat && t.location_lng ? {
+          name: t.location_name,
+          lat: t.location_lat,
+          lng: t.location_lng,
+          radius: t.location_radius || 100,
+        } : undefined,
       }));
 
       setTasks(mappedTasks);
@@ -186,6 +223,14 @@ export const useTasks = () => {
         status: data.status as Task['status'],
         createdAt: data.created_at,
         nextReminder: data.next_reminder ? formatNextReminder(data.next_reminder) : undefined,
+        priority: (data.priority || 'medium') as Priority,
+        estimatedMinutes: data.estimated_minutes || undefined,
+        location: data.location_name && data.location_lat && data.location_lng ? {
+          name: data.location_name,
+          lat: data.location_lat,
+          lng: data.location_lng,
+          radius: data.location_radius || 100,
+        } : undefined,
       };
 
       setTasks((prev) => [newTask, ...prev]);
@@ -306,6 +351,23 @@ export const useTasks = () => {
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.taskType !== undefined) dbUpdates.task_type = updates.taskType;
       if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule || null;
+      if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
+      if (updates.estimatedMinutes !== undefined) dbUpdates.estimated_minutes = updates.estimatedMinutes || null;
+      
+      // Handle location updates
+      if (updates.location !== undefined) {
+        if (updates.location) {
+          dbUpdates.location_name = updates.location.name;
+          dbUpdates.location_lat = updates.location.lat;
+          dbUpdates.location_lng = updates.location.lng;
+          dbUpdates.location_radius = updates.location.radius;
+        } else {
+          dbUpdates.location_name = null;
+          dbUpdates.location_lat = null;
+          dbUpdates.location_lng = null;
+          dbUpdates.location_radius = null;
+        }
+      }
 
       const { error } = await supabase
         .from('tasks')
