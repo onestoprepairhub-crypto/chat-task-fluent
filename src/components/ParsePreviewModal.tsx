@@ -1,5 +1,5 @@
 import { ParsedTask } from '@/hooks/useTasks';
-import { X, Calendar, Clock, Bell, RefreshCw } from 'lucide-react';
+import { X, Calendar, Clock, Bell, RefreshCw, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface ParsePreviewModalProps {
@@ -47,6 +47,7 @@ export const ParsePreviewModal = ({
       case 'call': return 'Call';
       case 'email': return 'Email';
       case 'reminder': return 'Reminder';
+      case 'location': return 'Location Reminder';
       default: return 'One-time Task';
     }
   };
@@ -56,9 +57,12 @@ export const ParsePreviewModal = ({
       case 'meeting': return <Calendar className="w-4 h-4" />;
       case 'recurring': return <RefreshCw className="w-4 h-4" />;
       case 'deadline': return <Clock className="w-4 h-4" />;
+      case 'location': return <MapPin className="w-4 h-4" />;
       default: return <Bell className="w-4 h-4" />;
     }
   };
+
+  const isLocationTask = parsedTask.is_location_task || parsedTask.task_type === 'location';
 
   // Format reminders for display in IST
   const formattedReminders = parsedTask.reminder_times.map(formatReminderIST);
@@ -119,17 +123,32 @@ export const ParsePreviewModal = ({
               </div>
             )}
 
-            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-              <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <div>
-                <span className="font-medium text-foreground">Reminders (IST):</span>
-                <div className="mt-1 space-y-1">
-                  {formattedReminders.map((reminder, idx) => (
-                    <div key={idx} className="text-foreground">{reminder}</div>
-                  ))}
+            {isLocationTask && parsedTask.location_name && (
+              <div className="flex items-center gap-2 text-sm bg-primary/10 p-3 rounded-xl">
+                <MapPin className="w-4 h-4 text-primary" />
+                <div>
+                  <span className="font-medium text-foreground">Location Trigger:</span>
+                  <p className="text-muted-foreground">{parsedTask.location_name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You'll need to set the exact location on the map after adding this task.
+                  </p>
                 </div>
               </div>
-            </div>
+            )}
+
+            {!isLocationTask && formattedReminders.length > 0 && (
+              <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                <Bell className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="font-medium text-foreground">Reminders (IST):</span>
+                  <div className="mt-1 space-y-1">
+                    {formattedReminders.map((reminder, idx) => (
+                      <div key={idx} className="text-foreground">{reminder}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {parsedTask.repeat_rule && parsedTask.repeat_rule !== 'none' && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">

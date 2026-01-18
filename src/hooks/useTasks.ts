@@ -10,6 +10,7 @@ export const TASK_TYPES = [
   { value: 'one-time', label: 'One-time', icon: 'Bell' },
   { value: 'recurring', label: 'Recurring', icon: 'Repeat' },
   { value: 'reminder', label: 'Reminder', icon: 'BellRing' },
+  { value: 'location', label: 'Location', icon: 'MapPin' },
   { value: 'habit', label: 'Habit', icon: 'Flame' },
   { value: 'goal', label: 'Goal', icon: 'Target' },
   { value: 'project', label: 'Project', icon: 'FolderKanban' },
@@ -80,12 +81,14 @@ export interface Task {
 
 export interface ParsedTask {
   task_title: string;
-  task_type: 'deadline' | 'meeting' | 'one-time' | 'recurring';
+  task_type: 'deadline' | 'meeting' | 'one-time' | 'recurring' | 'location' | 'call' | 'email' | 'reminder';
   start_date?: string;
   end_date?: string;
   reminder_times: string[];
   repeat_rule?: string;
   priority?: Priority;
+  is_location_task?: boolean;
+  location_name?: string;
 }
 
 const PARSE_TASK_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-task`;

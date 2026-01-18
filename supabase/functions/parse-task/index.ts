@@ -87,12 +87,23 @@ TASK TYPE DETECTION:
 - 'email' for sending emails
 - 'reminder' for general reminders
 - 'one-time' for single tasks
+- 'location' for location-based reminders (when user mentions "when I reach", "when I visit", "when I arrive at", "at location", etc.)
+
+LOCATION-BASED TASKS:
+If user mentions a location trigger like:
+- "when I reach [place]"
+- "when I visit [place]"
+- "when I arrive at [place]"
+- "remind me at [place]"
+- "notify me when at [place]"
+Extract the location_name and set task_type to 'location'. Do NOT set reminder_times for location tasks - they trigger when user arrives at location.
 
 IMPORTANT RULES:
-1. Always set start_date when any date reference is found
+1. Always set start_date when any date reference is found (use today for location tasks if no date)
 2. For tasks with dates but no times, use smart defaults above
-3. Extract the clean task title without date/time words
-4. For recurring tasks, set repeat_rule appropriately`
+3. Extract the clean task title without date/time/location trigger words
+4. For recurring tasks, set repeat_rule appropriately
+5. For location tasks, extract the location name and set is_location_task to true`
           },
           {
             role: "user",
@@ -114,8 +125,8 @@ IMPORTANT RULES:
                   },
                   task_type: {
                     type: "string",
-                    enum: ["deadline", "meeting", "one-time", "recurring", "call", "email", "reminder"],
-                    description: "The type of task"
+                    enum: ["deadline", "meeting", "one-time", "recurring", "call", "email", "reminder", "location"],
+                    description: "The type of task. Use 'location' for location-based reminders (when user mentions arriving at a place)."
                   },
                   start_date: {
                     type: "string",
@@ -139,9 +150,17 @@ IMPORTANT RULES:
                     type: "string",
                     enum: ["low", "medium", "high", "urgent"],
                     description: "Priority level. Default to 'medium'. Use 'high' for important/urgent keywords, 'urgent' for ASAP/critical."
+                  },
+                  is_location_task: {
+                    type: "boolean",
+                    description: "Set to true if task should trigger when user arrives at a location"
+                  },
+                  location_name: {
+                    type: "string",
+                    description: "Name of the location to trigger reminder (e.g., 'Bhagwati Resort', 'Office', 'Mall')"
                   }
                 },
-                required: ["task_title", "task_type", "reminder_times", "start_date"],
+                required: ["task_title", "task_type", "start_date"],
                 additionalProperties: false
               }
             }
@@ -181,8 +200,11 @@ IMPORTANT RULES:
     const parsedTask = JSON.parse(toolCall.function.arguments);
     console.log("Parsed task:", parsedTask);
 
-    // Ensure reminder_times is always an array
-    if (!parsedTask.reminder_times || !Array.isArray(parsedTask.reminder_times)) {
+    // For location tasks, don't require reminder_times (they trigger on arrival)
+    if (parsedTask.is_location_task || parsedTask.task_type === 'location') {
+      parsedTask.reminder_times = [];
+      parsedTask.is_location_task = true;
+    } else if (!parsedTask.reminder_times || !Array.isArray(parsedTask.reminder_times)) {
       parsedTask.reminder_times = ["9:00 AM"];
     }
 
