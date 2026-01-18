@@ -3,14 +3,48 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useToast } from './use-toast';
 
+export const TASK_TYPES = [
+  { value: 'general', label: 'General', icon: 'Circle' },
+  { value: 'deadline', label: 'Deadline', icon: 'Clock' },
+  { value: 'meeting', label: 'Meeting', icon: 'Calendar' },
+  { value: 'one-time', label: 'One-time', icon: 'Bell' },
+  { value: 'recurring', label: 'Recurring', icon: 'Repeat' },
+  { value: 'reminder', label: 'Reminder', icon: 'BellRing' },
+  { value: 'habit', label: 'Habit', icon: 'Flame' },
+  { value: 'goal', label: 'Goal', icon: 'Target' },
+  { value: 'project', label: 'Project', icon: 'FolderKanban' },
+  { value: 'errand', label: 'Errand', icon: 'ShoppingBag' },
+  { value: 'call', label: 'Call', icon: 'Phone' },
+  { value: 'email', label: 'Email', icon: 'Mail' },
+  { value: 'payment', label: 'Payment', icon: 'CreditCard' },
+  { value: 'health', label: 'Health', icon: 'Heart' },
+  { value: 'exercise', label: 'Exercise', icon: 'Dumbbell' },
+  { value: 'study', label: 'Study', icon: 'GraduationCap' },
+] as const;
+
+export const REPEAT_RULES = [
+  { value: '', label: 'No repeat' },
+  { value: 'daily', label: 'Daily' },
+  { value: 'weekdays', label: 'Weekdays (Mon-Fri)' },
+  { value: 'weekends', label: 'Weekends (Sat-Sun)' },
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'biweekly', label: 'Every 2 weeks' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Every 3 months' },
+  { value: 'yearly', label: 'Yearly' },
+] as const;
+
+export type TaskType = typeof TASK_TYPES[number]['value'];
+export type RepeatRule = typeof REPEAT_RULES[number]['value'];
+
 export interface Task {
   id: string;
   title: string;
-  taskType: 'deadline' | 'meeting' | 'one-time' | 'recurring';
+  taskType: TaskType;
   startDate?: string;
   endDate?: string;
   reminderTimes: string[];
-  repeatRule?: string;
+  repeatRule?: RepeatRule;
   status: 'active' | 'completed' | 'snoozed';
   createdAt: string;
   nextReminder?: string;
@@ -57,7 +91,7 @@ export const useTasks = () => {
         startDate: t.start_date,
         endDate: t.end_date,
         reminderTimes: t.reminder_times || [],
-        repeatRule: t.repeat_rule,
+        repeatRule: (t.repeat_rule || '') as RepeatRule,
         status: t.status as Task['status'],
         createdAt: t.created_at,
         nextReminder: t.next_reminder ? formatNextReminder(t.next_reminder) : undefined,
@@ -148,7 +182,7 @@ export const useTasks = () => {
         startDate: data.start_date,
         endDate: data.end_date,
         reminderTimes: data.reminder_times || [],
-        repeatRule: data.repeat_rule,
+        repeatRule: (data.repeat_rule || '') as RepeatRule,
         status: data.status as Task['status'],
         createdAt: data.created_at,
         nextReminder: data.next_reminder ? formatNextReminder(data.next_reminder) : undefined,
@@ -270,6 +304,8 @@ export const useTasks = () => {
       if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
       if (updates.reminderTimes !== undefined) dbUpdates.reminder_times = updates.reminderTimes;
       if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.taskType !== undefined) dbUpdates.task_type = updates.taskType;
+      if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule || null;
 
       const { error } = await supabase
         .from('tasks')
