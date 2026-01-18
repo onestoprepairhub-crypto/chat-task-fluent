@@ -29,7 +29,17 @@ serve(async (req) => {
 
     console.log("Parsing task input:", input);
 
-    const today = new Date().toISOString().split('T')[0];
+    // Get today's date in IST (UTC+5:30)
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours 30 minutes in ms
+    const istTime = new Date(now.getTime() + istOffset);
+    const today = istTime.toISOString().split('T')[0];
+    
+    // Calculate tomorrow in IST
+    const tomorrowIST = new Date(istTime.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrow = tomorrowIST.toISOString().split('T')[0];
+    
+    console.log("Today (IST):", today, "Tomorrow (IST):", tomorrow);
     
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -42,16 +52,19 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a task parsing assistant. Today's date is ${today}. Extract structured task information from natural language input. Be smart about interpreting dates, times, and task types.
+            content: `You are a task parsing assistant. Today's date is ${today} and tomorrow is ${tomorrow}. All dates are in Indian Standard Time (IST). Extract structured task information from natural language input. Be smart about interpreting dates, times, and task types.
 
 When parsing:
-- "tomorrow" means the day after today
+- "today" means ${today}
+- "tomorrow" means ${tomorrow}
 - "next week" means 7 days from today  
-- Times like "8am" should be formatted as "8:00 AM"
+- Times like "8am", "8 am", "8:00am" should be formatted as "8:00 AM"
+- Times like "9:30 am" should be formatted as "9:30 AM"
 - If no specific time is mentioned, default to "9:00 AM"
 - If user mentions multiple reminder times, extract all of them
 - Detect task type: 'meeting' for meetings/calls, 'deadline' for due dates, 'recurring' for daily/weekly tasks, 'one-time' for single reminders
-- For recurring tasks, extract the repeat_rule (daily, weekly, monthly)`
+- For recurring tasks, extract the repeat_rule (daily, weekly, monthly)
+- IMPORTANT: Always set start_date when a date like "today" or "tomorrow" is mentioned`
           },
           {
             role: "user",
