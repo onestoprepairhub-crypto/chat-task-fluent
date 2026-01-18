@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { Bell, Calendar, Check, Clock, ChevronRight } from 'lucide-react';
-import { Task } from '@/hooks/useTasks';
+import { Bell, Calendar, Check, Clock, ChevronRight, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame } from 'lucide-react';
+import { Task, TaskType } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
@@ -9,6 +9,45 @@ interface TaskCardProps {
   onSnooze: (id: string) => void;
   onClick: (task: Task) => void;
 }
+
+const getTypeIcon = (taskType: TaskType) => {
+  const iconClass = "w-4 h-4";
+  switch (taskType) {
+    case 'meeting':
+      return <Calendar className={iconClass} />;
+    case 'deadline':
+      return <Clock className={iconClass} />;
+    case 'recurring':
+      return <Repeat className={iconClass} />;
+    case 'reminder':
+      return <BellRing className={iconClass} />;
+    case 'habit':
+      return <Flame className={iconClass} />;
+    case 'goal':
+      return <Target className={iconClass} />;
+    case 'project':
+      return <FolderKanban className={iconClass} />;
+    case 'errand':
+      return <ShoppingBag className={iconClass} />;
+    case 'call':
+      return <Phone className={iconClass} />;
+    case 'email':
+      return <Mail className={iconClass} />;
+    case 'payment':
+      return <CreditCard className={iconClass} />;
+    case 'health':
+      return <Heart className={iconClass} />;
+    case 'exercise':
+      return <Dumbbell className={iconClass} />;
+    case 'study':
+      return <GraduationCap className={iconClass} />;
+    case 'one-time':
+      return <Bell className={iconClass} />;
+    case 'general':
+    default:
+      return <Circle className={iconClass} />;
+  }
+};
 
 export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps) => {
   const [swipeX, setSwipeX] = useState(0);
@@ -40,17 +79,6 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
     setIsSwiping(false);
   };
 
-  const getTypeIcon = () => {
-    switch (task.taskType) {
-      case 'meeting':
-        return <Calendar className="w-4 h-4" />;
-      case 'deadline':
-        return <Clock className="w-4 h-4" />;
-      default:
-        return <Bell className="w-4 h-4" />;
-    }
-  };
-
   const getStatusBadge = () => {
     if (task.status === 'completed') {
       return <span className="status-badge status-completed">Completed</span>;
@@ -59,6 +87,15 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
       return <span className="status-badge bg-warning/15 text-warning">Snoozed</span>;
     }
     return <span className="status-badge status-active">Active</span>;
+  };
+
+  const getTypeBadge = () => {
+    const typeLabel = task.taskType?.replace('-', ' ') || 'general';
+    return (
+      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground capitalize">
+        {typeLabel}
+      </span>
+    );
   };
 
   return (
@@ -93,9 +130,16 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-muted-foreground">{getTypeIcon()}</span>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-muted-foreground">{getTypeIcon(task.taskType)}</span>
+              {getTypeBadge()}
               {getStatusBadge()}
+              {task.repeatRule && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Repeat className="w-3 h-3" />
+                  {task.repeatRule}
+                </span>
+              )}
             </div>
             <h3 className={cn(
               "font-medium text-foreground line-clamp-2",

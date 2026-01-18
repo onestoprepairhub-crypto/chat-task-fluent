@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { X, Trash2, Check, Bell, Calendar, Clock, Save } from 'lucide-react';
-import { Task } from '@/hooks/useTasks';
+import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame } from 'lucide-react';
+import { Task, TASK_TYPES, REPEAT_RULES, TaskType, RepeatRule } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TaskDetailSheetProps {
   task: Task;
@@ -11,6 +12,25 @@ interface TaskDetailSheetProps {
   onDelete: (taskId: string) => void;
   onComplete: (taskId: string) => void;
 }
+
+const iconMap: Record<string, React.ReactNode> = {
+  Circle: <Circle className="w-4 h-4" />,
+  Clock: <Clock className="w-4 h-4" />,
+  Calendar: <Calendar className="w-4 h-4" />,
+  Bell: <Bell className="w-4 h-4" />,
+  Repeat: <Repeat className="w-4 h-4" />,
+  BellRing: <BellRing className="w-4 h-4" />,
+  Flame: <Flame className="w-4 h-4" />,
+  Target: <Target className="w-4 h-4" />,
+  FolderKanban: <FolderKanban className="w-4 h-4" />,
+  ShoppingBag: <ShoppingBag className="w-4 h-4" />,
+  Phone: <Phone className="w-4 h-4" />,
+  Mail: <Mail className="w-4 h-4" />,
+  CreditCard: <CreditCard className="w-4 h-4" />,
+  Heart: <Heart className="w-4 h-4" />,
+  Dumbbell: <Dumbbell className="w-4 h-4" />,
+  GraduationCap: <GraduationCap className="w-4 h-4" />,
+};
 
 export const TaskDetailSheet = ({
   task,
@@ -22,6 +42,8 @@ export const TaskDetailSheet = ({
   const [title, setTitle] = useState(task.title);
   const [endDate, setEndDate] = useState(task.endDate || '');
   const [reminderTimes, setReminderTimes] = useState(task.reminderTimes.join(', '));
+  const [taskType, setTaskType] = useState<TaskType>(task.taskType || 'general');
+  const [repeatRule, setRepeatRule] = useState<RepeatRule>(task.repeatRule || '');
   const [hasChanges, setHasChanges] = useState(false);
 
   const handleChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,6 +56,8 @@ export const TaskDetailSheet = ({
       title,
       endDate: endDate || undefined,
       reminderTimes: reminderTimes.split(',').map(t => t.trim()).filter(Boolean),
+      taskType,
+      repeatRule: repeatRule || undefined,
     });
     onClose();
   };
@@ -73,6 +97,61 @@ export const TaskDetailSheet = ({
             />
           </div>
 
+          {/* Task Type */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Task Type
+            </label>
+            <Select
+              value={taskType}
+              onValueChange={(value: TaskType) => {
+                setTaskType(value);
+                setHasChanges(true);
+              }}
+            >
+              <SelectTrigger className="h-12 rounded-xl bg-secondary border-0">
+                <SelectValue placeholder="Select task type" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border border-border">
+                {TASK_TYPES.map((type) => (
+                  <SelectItem key={type.value} value={type.value}>
+                    <div className="flex items-center gap-2">
+                      {iconMap[type.icon]}
+                      <span>{type.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Repeat Rule */}
+          <div>
+            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+              <Repeat className="w-4 h-4" />
+              Repeat
+            </label>
+            <Select
+              value={repeatRule}
+              onValueChange={(value: RepeatRule) => {
+                setRepeatRule(value);
+                setHasChanges(true);
+              }}
+            >
+              <SelectTrigger className="h-12 rounded-xl bg-secondary border-0">
+                <SelectValue placeholder="Select repeat frequency" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border border-border">
+                {REPEAT_RULES.map((rule) => (
+                  <SelectItem key={rule.value || 'none'} value={rule.value}>
+                    {rule.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* End Date */}
           <div>
             <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
@@ -102,24 +181,6 @@ export const TaskDetailSheet = ({
             <p className="text-xs text-muted-foreground mt-1">
               Separate multiple times with commas
             </p>
-          </div>
-
-          {/* Task Type Badge */}
-          <div>
-            <label className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Task Type
-            </label>
-            <div className="flex items-center gap-2">
-              <span className="status-badge status-active capitalize">
-                {task.taskType.replace('-', ' ')}
-              </span>
-              {task.repeatRule && (
-                <span className="text-sm text-muted-foreground">
-                  Repeats {task.repeatRule}
-                </span>
-              )}
-            </div>
           </div>
         </div>
 
