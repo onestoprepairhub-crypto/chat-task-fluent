@@ -26,38 +26,56 @@ function getTodayIST(): string {
 
 // Parse reminder string like "9:00 AM" or "2025-01-18T09:00:00" into ReminderDateTime (IST)
 function parseReminderToDateTime(reminder: string, defaultDate: string): ReminderDateTime {
-  // Check if it's an ISO string (stored as UTC)
-  if (reminder.includes('T') || reminder.match(/^\d{4}-\d{2}-\d{2}/)) {
-    const utcDate = new Date(reminder);
-    if (!isNaN(utcDate.getTime())) {
-      // Convert UTC to IST for display
-      const istDate = new Date(utcDate.getTime() + IST_OFFSET_MS);
-      const year = istDate.getUTCFullYear();
-      const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
-      const day = String(istDate.getUTCDate()).padStart(2, '0');
-      const hours = String(istDate.getUTCHours()).padStart(2, '0');
-      const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
-      return {
-        date: `${year}-${month}-${day}`,
-        time: `${hours}:${minutes}`,
-      };
+  try {
+    // Check if it's an ISO string (stored as UTC)
+    if (reminder && (reminder.includes('T') || reminder.match(/^\d{4}-\d{2}-\d{2}/))) {
+      const utcDate = new Date(reminder);
+      if (!isNaN(utcDate.getTime())) {
+        // Format using IST timezone
+        const options: Intl.DateTimeFormatOptions = {
+          timeZone: 'Asia/Kolkata',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
+        };
+        const formatter = new Intl.DateTimeFormat('en-CA', options);
+        const parts = formatter.formatToParts(utcDate);
+        
+        const year = parts.find(p => p.type === 'year')?.value || '2026';
+        const month = parts.find(p => p.type === 'month')?.value || '01';
+        const day = parts.find(p => p.type === 'day')?.value || '01';
+        const hour = parts.find(p => p.type === 'hour')?.value || '09';
+        const minute = parts.find(p => p.type === 'minute')?.value || '00';
+        
+        return {
+          date: `${year}-${month}-${day}`,
+          time: `${hour}:${minute}`,
+        };
+      }
     }
-  }
-  
-  // Parse time like "9:00 AM" or "2:30 PM"
-  const match = reminder.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
-  if (match) {
-    let hours = parseInt(match[1]);
-    const minutes = match[2];
-    const period = match[3]?.toUpperCase();
     
-    if (period === 'PM' && hours !== 12) hours += 12;
-    if (period === 'AM' && hours === 12) hours = 0;
-    
-    return {
-      date: defaultDate || getTodayIST(),
-      time: `${hours.toString().padStart(2, '0')}:${minutes}`,
-    };
+    // Parse time like "9:00 AM" or "2:30 PM"
+    if (reminder) {
+      const match = reminder.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
+      if (match) {
+        let hours = parseInt(match[1]);
+        const minutes = match[2];
+        const period = match[3]?.toUpperCase();
+        
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        
+        return {
+          date: defaultDate || getTodayIST(),
+          time: `${hours.toString().padStart(2, '0')}:${minutes}`,
+        };
+      }
+    }
+  } catch (error) {
+    console.error('Error parsing reminder:', reminder, error);
   }
   
   // Default to 9 AM on the given date
@@ -116,24 +134,41 @@ export const TaskDetailSheet = ({
   onDelete,
   onComplete,
 }: TaskDetailSheetProps) => {
-  const [title, setTitle] = useState(task.title);
-  const [startDate, setStartDate] = useState(task.startDate || '');
-  const [endDate, setEndDate] = useState(task.endDate || '');
-  const [taskType, setTaskType] = useState<TaskType>(task.taskType || 'general');
-  const [repeatRule, setRepeatRule] = useState<RepeatRule>(task.repeatRule || '');
-  const [priority, setPriority] = useState<Priority>(task.priority || 'medium');
-  const [estimatedMinutes, setEstimatedMinutes] = useState<number | undefined>(task.estimatedMinutes);
-  const [location, setLocation] = useState<TaskLocation | undefined>(task.location);
+  // Safe initialization with fallbacks
+  const safeTask = {
+    ...task,
+    title: task?.title || '',
+    taskType: task?.taskType || 'general',
+    repeatRule: task?.repeatRule || '',
+    priority: task?.priority || 'medium',
+    reminderTimes: Array.isArray(task?.reminderTimes) ? task.reminderTimes : [],
+    startDate: task?.startDate || '',
+    endDate: task?.endDate || '',
+  };
+
+  const [title, setTitle] = useState(safeTask.title);
+  const [startDate, setStartDate] = useState(safeTask.startDate);
+  const [endDate, setEndDate] = useState(safeTask.endDate);
+  const [taskType, setTaskType] = useState<TaskType>(safeTask.taskType as TaskType);
+  const [repeatRule, setRepeatRule] = useState<RepeatRule>(safeTask.repeatRule as RepeatRule);
+  const [priority, setPriority] = useState<Priority>(safeTask.priority as Priority);
+  const [estimatedMinutes, setEstimatedMinutes] = useState<number | undefined>(task?.estimatedMinutes);
+  const [location, setLocation] = useState<TaskLocation | undefined>(task?.location);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Parse existing reminder times into structured format
+  // Parse existing reminder times into structured format with safe defaults
   const defaultDate = startDate || endDate || getTodayIST();
   const [reminders, setReminders] = useState<ReminderDateTime[]>(() => {
-    if (task.reminderTimes.length === 0) {
+    try {
+      if (!safeTask.reminderTimes || safeTask.reminderTimes.length === 0) {
+        return [{ date: defaultDate, time: '09:00' }];
+      }
+      return safeTask.reminderTimes.map(r => parseReminderToDateTime(r, defaultDate));
+    } catch (error) {
+      console.error('Error initializing reminders:', error);
       return [{ date: defaultDate, time: '09:00' }];
     }
-    return task.reminderTimes.map(r => parseReminderToDateTime(r, defaultDate));
   });
 
   const handleChange = (setter: (val: string) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {

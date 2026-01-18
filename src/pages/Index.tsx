@@ -220,8 +220,9 @@ const Index = () => {
         />
       )}
 
-      {selectedTask && (
+      {selectedTask && selectedTask.id && (
         <TaskDetailSheet
+          key={selectedTask.id}
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           onUpdate={updateTask}
