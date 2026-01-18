@@ -2,3 +2,9 @@ project_id = "mmsfxqauzoyulttoqrdo"
 
 [functions.parse-task]
 verify_jwt = false
+
+[functions.send-notification]
+verify_jwt = false
+
+[functions.notification-action]
+verify_jwt = false
