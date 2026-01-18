@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
-import { Bell, Calendar, Check, Clock, ChevronRight, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame } from 'lucide-react';
-import { Task, TaskType } from '@/hooks/useTasks';
+import { Bell, Calendar, Check, Clock, ChevronRight, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, MapPin, Timer } from 'lucide-react';
+import { Task, TaskType, Priority, PRIORITY_LEVELS } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
@@ -49,6 +49,22 @@ const getTypeIcon = (taskType: TaskType) => {
   }
 };
 
+const getPriorityIndicator = (priority: Priority) => {
+  const config = PRIORITY_LEVELS.find(p => p.value === priority);
+  if (!config) return null;
+  return (
+    <span className={cn("w-2 h-2 rounded-full", config.bg.replace('/15', ''))}>
+    </span>
+  );
+};
+
+const formatDuration = (minutes: number): string => {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+};
+
 export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps) => {
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -89,11 +105,12 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
     return <span className="status-badge status-active">Active</span>;
   };
 
-  const getTypeBadge = () => {
-    const typeLabel = task.taskType?.replace('-', ' ') || 'general';
+  const getPriorityBadge = () => {
+    const config = PRIORITY_LEVELS.find(p => p.value === task.priority);
+    if (!config || task.priority === 'medium') return null;
     return (
-      <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground capitalize">
-        {typeLabel}
+      <span className={cn("text-xs px-2 py-0.5 rounded-full capitalize", config.bg, config.color)}>
+        {config.label}
       </span>
     );
   };
@@ -120,7 +137,9 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
       <div
         className={cn(
           "task-card relative z-10 touch-action-pan-y",
-          task.status === 'completed' && "opacity-60"
+          task.status === 'completed' && "opacity-60",
+          task.priority === 'urgent' && "border-l-4 border-l-destructive",
+          task.priority === 'high' && "border-l-4 border-l-warning"
         )}
         style={{ transform: `translateX(${swipeX}px)` }}
         onTouchStart={handleTouchStart}
@@ -132,7 +151,7 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-muted-foreground">{getTypeIcon(task.taskType)}</span>
-              {getTypeBadge()}
+              {getPriorityBadge()}
               {getStatusBadge()}
               {task.repeatRule && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -147,12 +166,26 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
             )}>
               {task.title}
             </h3>
-            {task.nextReminder && task.status !== 'completed' && (
-              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1">
-                <Bell className="w-3 h-3" />
-                {task.nextReminder}
-              </p>
-            )}
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              {task.nextReminder && task.status !== 'completed' && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Bell className="w-3 h-3" />
+                  {task.nextReminder}
+                </p>
+              )}
+              {task.estimatedMinutes && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Timer className="w-3 h-3" />
+                  {formatDuration(task.estimatedMinutes)}
+                </p>
+              )}
+              {task.location && (
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {task.location.name}
+                </p>
+              )}
+            </div>
           </div>
           <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" />
         </div>
