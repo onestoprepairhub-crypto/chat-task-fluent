@@ -132,8 +132,8 @@ IMPORTANT RULES:
                   },
                   repeat_rule: {
                     type: "string",
-                    enum: ["daily", "weekly", "monthly", ""],
-                    description: "Repeat rule for recurring tasks"
+                    enum: ["daily", "weekly", "monthly", "none"],
+                    description: "Repeat rule for recurring tasks. Use 'none' for no repeat."
                   },
                   priority: {
                     type: "string",

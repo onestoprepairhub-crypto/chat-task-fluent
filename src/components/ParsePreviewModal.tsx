@@ -131,7 +131,7 @@ export const ParsePreviewModal = ({
               </div>
             </div>
 
-            {parsedTask.repeat_rule && (
+            {parsedTask.repeat_rule && parsedTask.repeat_rule !== 'none' && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <RefreshCw className="w-4 h-4" />
                 <span>Repeats: {parsedTask.repeat_rule}</span>

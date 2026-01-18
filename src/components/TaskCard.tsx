@@ -153,7 +153,7 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
               <span className="text-muted-foreground">{getTypeIcon(task.taskType)}</span>
               {getPriorityBadge()}
               {getStatusBadge()}
-              {task.repeatRule && (
+              {task.repeatRule && task.repeatRule !== 'none' && (
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Repeat className="w-3 h-3" />
                   {task.repeatRule}
