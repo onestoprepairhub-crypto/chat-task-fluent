@@ -33,6 +33,7 @@ export const LocationPicker = ({ value, onChange, onClose }: LocationPickerProps
   const [radius, setRadius] = useState(value?.radius || 100);
   const [isSearching, setIsSearching] = useState(false);
   const [mapCenter, setMapCenter] = useState(value ? { lat: value.lat, lng: value.lng } : defaultCenter);
+  const [hasApiKey] = useState(() => !!import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
   
   const mapRef = useRef<google.maps.Map | null>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
@@ -43,25 +44,47 @@ export const LocationPicker = ({ value, onChange, onClose }: LocationPickerProps
     libraries,
   });
 
+  // Check for missing API key
+  if (!hasApiKey) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <div className="bg-card rounded-2xl p-6 max-w-sm mx-4 shadow-xl border border-border">
+          <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground text-center mb-2">Google Maps API Key Required</h3>
+          <p className="text-sm text-muted-foreground text-center mb-4">
+            To use location reminders, please add your Google Maps API key in the project settings.
+          </p>
+          <Button onClick={onClose} className="w-full rounded-xl">
+            Close
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Initialize autocomplete when map is loaded
   useEffect(() => {
     if (isLoaded && inputRef.current && !autocompleteRef.current) {
-      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-        componentRestrictions: { country: 'in' }, // Restrict to India
-        fields: ['geometry', 'name', 'formatted_address'],
-      });
+      try {
+        autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+          componentRestrictions: { country: 'in' }, // Restrict to India
+          fields: ['geometry', 'name', 'formatted_address'],
+        });
 
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current?.getPlace();
-        if (place?.geometry?.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          setSelectedLocation({ lat, lng });
-          setMapCenter({ lat, lng });
-          setLocationName(place.name || place.formatted_address || 'Selected Location');
-          mapRef.current?.panTo({ lat, lng });
-        }
-      });
+        autocompleteRef.current.addListener('place_changed', () => {
+          const place = autocompleteRef.current?.getPlace();
+          if (place?.geometry?.location) {
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            setSelectedLocation({ lat, lng });
+            setMapCenter({ lat, lng });
+            setLocationName(place.name || place.formatted_address || 'Selected Location');
+            mapRef.current?.panTo({ lat, lng });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to initialize autocomplete:', error);
+      }
     }
   }, [isLoaded]);
 
@@ -141,10 +164,14 @@ export const LocationPicker = ({ value, onChange, onClose }: LocationPickerProps
 
   if (loadError) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-        <div className="glass-card p-6 max-w-md mx-4">
-          <p className="text-destructive">Failed to load Google Maps. Please check your API key.</p>
-          <Button onClick={onClose} className="mt-4 w-full">Close</Button>
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <div className="bg-card rounded-2xl p-6 max-w-sm mx-4 shadow-xl border border-border">
+          <MapPin className="w-12 h-12 text-destructive mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground text-center mb-2">Map Loading Failed</h3>
+          <p className="text-sm text-muted-foreground text-center mb-4">
+            Failed to load Google Maps. Please check your API key and try again.
+          </p>
+          <Button onClick={onClose} className="w-full rounded-xl">Close</Button>
         </div>
       </div>
     );
@@ -152,18 +179,18 @@ export const LocationPicker = ({ value, onChange, onClose }: LocationPickerProps
 
   if (!isLoaded) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-        <div className="glass-card p-6">
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
+        <div className="bg-card rounded-2xl p-6 max-w-sm shadow-xl border border-border">
           <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          <p className="text-muted-foreground mt-2">Loading map...</p>
+          <p className="text-muted-foreground mt-2 text-center">Loading map...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-background/80 backdrop-blur-sm animate-fade-in">
-      <div className="glass-card w-full max-w-lg mx-4 mb-4 animate-slide-up max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-background/80 backdrop-blur-sm animate-fade-in p-2 sm:p-4">
+      <div className="bg-card rounded-2xl w-full max-w-lg shadow-xl border border-border animate-slide-up max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-card/95 backdrop-blur-xl p-4 border-b border-border flex items-center justify-between">
           <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
