@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Trash2, Check, Bell, Calendar, Clock, Save } from 'lucide-react';
-import { Task } from '@/types/task';
+import { Task } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 

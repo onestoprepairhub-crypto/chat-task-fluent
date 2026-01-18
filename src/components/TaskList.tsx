@@ -1,4 +1,4 @@
-import { Task } from '@/types/task';
+import { Task } from '@/hooks/useTasks';
 import { TaskCard } from './TaskCard';
 import { CheckCircle2, Inbox } from 'lucide-react';
 

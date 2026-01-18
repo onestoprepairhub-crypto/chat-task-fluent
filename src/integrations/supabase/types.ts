@@ -14,7 +14,90 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      tasks: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          next_reminder: string | null
+          reminder_times: string[]
+          repeat_rule: string | null
+          start_date: string | null
+          status: string
+          task_type: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          next_reminder?: string | null
+          reminder_times?: string[]
+          repeat_rule?: string | null
+          start_date?: string | null
+          status?: string
+          task_type: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          next_reminder?: string | null
+          reminder_times?: string[]
+          repeat_rule?: string | null
+          start_date?: string | null
+          status?: string
+          task_type?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          daily_summary: boolean
+          default_snooze_minutes: number
+          fcm_token: string | null
+          id: string
+          quiet_end: string | null
+          quiet_hours_enabled: boolean
+          quiet_start: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          daily_summary?: boolean
+          default_snooze_minutes?: number
+          fcm_token?: string | null
+          id?: string
+          quiet_end?: string | null
+          quiet_hours_enabled?: boolean
+          quiet_start?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          daily_summary?: boolean
+          default_snooze_minutes?: number
+          fcm_token?: string | null
+          id?: string
+          quiet_end?: string | null
+          quiet_hours_enabled?: boolean
+          quiet_start?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

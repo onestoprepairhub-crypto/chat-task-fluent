@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Bell, Calendar, Check, Clock, ChevronRight } from 'lucide-react';
-import { Task } from '@/types/task';
+import { Task } from '@/hooks/useTasks';
 import { cn } from '@/lib/utils';
 
 interface TaskCardProps {

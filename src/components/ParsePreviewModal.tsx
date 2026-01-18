@@ -1,4 +1,4 @@
-import { ParsedTask } from '@/types/task';
+import { ParsedTask } from '@/hooks/useTasks';
 import { X, Calendar, Clock, Bell, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useTasks } from '@/hooks/useTasks';
+import { useTasks, ParsedTask, Task } from '@/hooks/useTasks';
+import { useAuth } from '@/hooks/useAuth';
 import { TaskInput } from '@/components/TaskInput';
 import { TaskList } from '@/components/TaskList';
 import { BottomNav, NavTab } from '@/components/BottomNav';
@@ -8,9 +9,11 @@ import { ParsePreviewModal } from '@/components/ParsePreviewModal';
 import { SnoozeModal } from '@/components/SnoozeModal';
 import { TaskDetailSheet } from '@/components/TaskDetailSheet';
 import { SettingsView } from '@/components/SettingsView';
-import { ParsedTask, Task } from '@/types/task';
+import { Loader2, LogOut } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
 
 const Index = () => {
+  const { user, isLoading: authLoading, signOut, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [pendingParse, setPendingParse] = useState<{
     input: string;
@@ -23,6 +26,7 @@ const Index = () => {
     activeTasks,
     completedTasks,
     isLoading,
+    isFetching,
     parseTask,
     addTask,
     completeTask,
@@ -31,9 +35,27 @@ const Index = () => {
     updateTask,
   } = useTasks();
 
+  // Redirect to auth if not logged in
+  if (!authLoading && !isAuthenticated) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   const handleTaskSubmit = async (input: string) => {
-    const parsed = await parseTask(input);
-    setPendingParse({ input, parsed });
+    try {
+      const parsed = await parseTask(input);
+      setPendingParse({ input, parsed });
+    } catch {
+      // Error already handled in useTasks
+    }
   };
 
   const handleConfirmTask = () => {
@@ -67,12 +89,18 @@ const Index = () => {
               subtitle={`${activeTasks.length} active task${activeTasks.length !== 1 ? 's' : ''}`}
             />
             <div className="px-4">
-              <TaskList
-                tasks={activeTasks}
-                onComplete={completeTask}
-                onSnooze={(id) => setSnoozeTaskId(id)}
-                onTaskClick={setSelectedTask}
-              />
+              {isFetching ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <TaskList
+                  tasks={activeTasks}
+                  onComplete={completeTask}
+                  onSnooze={(id) => setSnoozeTaskId(id)}
+                  onTaskClick={setSelectedTask}
+                />
+              )}
             </div>
             <TaskInput onSubmit={handleTaskSubmit} isLoading={isLoading} />
           </>
@@ -82,18 +110,24 @@ const Index = () => {
           <>
             <Header title="Completed" subtitle="Tasks you've finished" />
             <div className="px-4 pb-24">
-              <TaskList
-                tasks={completedTasks}
-                onComplete={completeTask}
-                onSnooze={(id) => setSnoozeTaskId(id)}
-                onTaskClick={setSelectedTask}
-                showCompleted
-              />
+              {isFetching ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <TaskList
+                  tasks={completedTasks}
+                  onComplete={completeTask}
+                  onSnooze={(id) => setSnoozeTaskId(id)}
+                  onTaskClick={setSelectedTask}
+                  showCompleted
+                />
+              )}
             </div>
           </>
         );
       case 'settings':
-        return <SettingsView />;
+        return <SettingsView onSignOut={signOut} />;
     }
   };
 
