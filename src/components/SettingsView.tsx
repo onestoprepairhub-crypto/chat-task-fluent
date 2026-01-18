@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { Bell, Clock, Moon, Smartphone, LogOut } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { useNotifications } from '@/hooks/useNotifications';
 
 interface SettingsState {
   dailySummary: boolean;
@@ -24,6 +25,14 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
     quietEnd: '07:00',
   });
 
+  const { 
+    isSupported, 
+    isEnabled, 
+    permissionStatus,
+    requestPermission, 
+    sendTestNotification 
+  } = useNotifications();
+
   const snoozeOptions = [10, 30, 60];
 
   return (
@@ -35,11 +44,62 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
         </p>
       </div>
 
+      {/* Push Notifications Section */}
+      <div className="glass-card p-4 space-y-4">
+        <h2 className="font-semibold text-foreground flex items-center gap-2">
+          <BellRing className="w-5 h-5 text-primary" />
+          Push Notifications
+        </h2>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-foreground">Enable Notifications</p>
+            <p className="text-sm text-muted-foreground">
+              {isEnabled 
+                ? 'Notifications are enabled' 
+                : 'Get reminders on your device'}
+            </p>
+          </div>
+          {isEnabled ? (
+            <div className="flex items-center gap-2 text-success">
+              <Check className="w-5 h-5" />
+              <span className="text-sm font-medium">Enabled</span>
+            </div>
+          ) : (
+            <Button
+              onClick={requestPermission}
+              size="sm"
+              className="rounded-xl"
+              disabled={!isSupported}
+            >
+              Enable
+            </Button>
+          )}
+        </div>
+
+        {isEnabled && (
+          <Button
+            onClick={sendTestNotification}
+            variant="outline"
+            size="sm"
+            className="w-full rounded-xl"
+          >
+            Send Test Notification
+          </Button>
+        )}
+
+        {!isSupported && (
+          <p className="text-xs text-muted-foreground">
+            Push notifications are not supported in this browser.
+          </p>
+        )}
+      </div>
+
       {/* Notifications Section */}
       <div className="glass-card p-4 space-y-4">
         <h2 className="font-semibold text-foreground flex items-center gap-2">
           <Bell className="w-5 h-5 text-primary" />
-          Notifications
+          Notification Preferences
         </h2>
 
         <div className="flex items-center justify-between">
@@ -142,7 +202,9 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Push Notifications</span>
-            <span className="text-success">Ready</span>
+            <span className={isEnabled ? "text-success" : "text-muted-foreground"}>
+              {isEnabled ? 'Enabled' : 'Disabled'}
+            </span>
           </div>
         </div>
       </div>

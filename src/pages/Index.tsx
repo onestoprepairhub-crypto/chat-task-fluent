@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTasks, ParsedTask, Task } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotificationScheduler } from '@/hooks/useNotificationScheduler';
 import { TaskInput } from '@/components/TaskInput';
 import { TaskList } from '@/components/TaskList';
 import { BottomNav, NavTab } from '@/components/BottomNav';
@@ -34,6 +35,13 @@ const Index = () => {
     deleteTask,
     updateTask,
   } = useTasks();
+
+  // Set up notification scheduler
+  useNotificationScheduler({
+    tasks: activeTasks,
+    onComplete: completeTask,
+    onSnooze: snoozeTask,
+  });
 
   // Redirect to auth if not logged in
   if (!authLoading && !isAuthenticated) {
