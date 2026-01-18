@@ -12,15 +12,32 @@ interface ReminderDateTime {
   time: string; // HH:MM (24-hour format for input)
 }
 
-// Parse reminder string like "9:00 AM" or "2025-01-18T09:00:00" into ReminderDateTime
+// IST is UTC+5:30
+const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+
+// Get current date in IST as YYYY-MM-DD
+function getTodayIST(): string {
+  const now = new Date();
+  const istTime = new Date(now.getTime() + IST_OFFSET_MS + now.getTimezoneOffset() * 60000);
+  return istTime.toISOString().split('T')[0];
+}
+
+// Parse reminder string like "9:00 AM" or "2025-01-18T09:00:00" into ReminderDateTime (IST)
 function parseReminderToDateTime(reminder: string, defaultDate: string): ReminderDateTime {
-  // Check if it's an ISO string
-  if (reminder.includes('T') || reminder.includes('-')) {
-    const date = new Date(reminder);
-    if (!isNaN(date.getTime())) {
+  // Check if it's an ISO string (stored as UTC)
+  if (reminder.includes('T') || reminder.match(/^\d{4}-\d{2}-\d{2}/)) {
+    const utcDate = new Date(reminder);
+    if (!isNaN(utcDate.getTime())) {
+      // Convert UTC to IST for display
+      const istDate = new Date(utcDate.getTime() + IST_OFFSET_MS);
+      const year = istDate.getUTCFullYear();
+      const month = String(istDate.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(istDate.getUTCDate()).padStart(2, '0');
+      const hours = String(istDate.getUTCHours()).padStart(2, '0');
+      const minutes = String(istDate.getUTCMinutes()).padStart(2, '0');
       return {
-        date: date.toISOString().split('T')[0],
-        time: date.toTimeString().slice(0, 5),
+        date: `${year}-${month}-${day}`,
+        time: `${hours}:${minutes}`,
       };
     }
   }
@@ -36,22 +53,31 @@ function parseReminderToDateTime(reminder: string, defaultDate: string): Reminde
     if (period === 'AM' && hours === 12) hours = 0;
     
     return {
-      date: defaultDate || new Date().toISOString().split('T')[0],
+      date: defaultDate || getTodayIST(),
       time: `${hours.toString().padStart(2, '0')}:${minutes}`,
     };
   }
   
   // Default to 9 AM on the given date
   return {
-    date: defaultDate || new Date().toISOString().split('T')[0],
+    date: defaultDate || getTodayIST(),
     time: '09:00',
   };
 }
 
-// Format ReminderDateTime back to display string
+// Format ReminderDateTime (IST) to ISO string (UTC) for storage
 function formatReminderDateTime(reminder: ReminderDateTime): string {
-  const date = new Date(`${reminder.date}T${reminder.time}:00`);
-  return date.toISOString();
+  // Parse the IST date and time
+  const [year, month, day] = reminder.date.split('-').map(Number);
+  const [hours, minutes] = reminder.time.split(':').map(Number);
+  
+  // Create a date in IST (as if it's UTC)
+  const istAsUtc = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+  
+  // Subtract IST offset to get actual UTC time
+  const utcTime = new Date(istAsUtc.getTime() - IST_OFFSET_MS);
+  
+  return utcTime.toISOString();
 }
 
 interface TaskDetailSheetProps {
@@ -100,7 +126,7 @@ export const TaskDetailSheet = ({
   const [hasChanges, setHasChanges] = useState(false);
 
   // Parse existing reminder times into structured format
-  const defaultDate = startDate || endDate || new Date().toISOString().split('T')[0];
+  const defaultDate = startDate || endDate || getTodayIST();
   const [reminders, setReminders] = useState<ReminderDateTime[]>(() => {
     if (task.reminderTimes.length === 0) {
       return [{ date: defaultDate, time: '09:00' }];
@@ -128,7 +154,8 @@ export const TaskDetailSheet = ({
   };
 
   const addReminder = () => {
-    setReminders(prev => [...prev, { date: defaultDate, time: '09:00' }]);
+    const newDate = startDate || endDate || getTodayIST();
+    setReminders(prev => [...prev, { date: newDate, time: '09:00' }]);
     setHasChanges(true);
   };
 
