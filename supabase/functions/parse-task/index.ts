@@ -57,7 +57,14 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a task parsing assistant. Today's date is ${today}, tomorrow is ${tomorrow}, and next week starts ${nextWeek}. Current hour in IST is ${currentHour}:00. All dates are in Indian Standard Time (IST). Extract structured task information from natural language input.
+            content: `You are a task parsing assistant with grammar correction capabilities. Today's date is ${today}, tomorrow is ${tomorrow}, and next week starts ${nextWeek}. Current hour in IST is ${currentHour}:00. All dates are in Indian Standard Time (IST). Extract structured task information from natural language input.
+
+GRAMMAR CORRECTION:
+- Always correct spelling and grammar mistakes in the task title
+- Fix capitalization (proper nouns, start of sentences)
+- Fix common typos and misspellings
+- Keep the corrected title natural and readable
+- Examples: "call hitesh ji" → "Call Hitesh ji", "buy grocries" → "Buy groceries", "submti report" → "Submit report"
 
 SMART TIME DEFAULTS (use these when specific time not mentioned):
 - "morning" → "9:00 AM"
@@ -115,13 +122,13 @@ IMPORTANT RULES:
             type: "function",
             function: {
               name: "extract_task",
-              description: "Extract structured task data from natural language",
+              description: "Extract structured task data from natural language with grammar correction",
               parameters: {
                 type: "object",
                 properties: {
                   task_title: {
                     type: "string",
-                    description: "A clean, concise title for the task (without date/time words)"
+                    description: "A clean, concise, GRAMMAR-CORRECTED title for the task (fix spelling, capitalization, without date/time words)"
                   },
                   task_type: {
                     type: "string",

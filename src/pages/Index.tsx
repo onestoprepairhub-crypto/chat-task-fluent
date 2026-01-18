@@ -95,6 +95,12 @@ const Index = () => {
     }
   };
 
+  const handleBulkDelete = async (ids: string[]) => {
+    for (const id of ids) {
+      await deleteTask(id);
+    }
+  };
+
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -153,6 +159,7 @@ const Index = () => {
                     onComplete={completeTask}
                     onSnooze={(id) => setSnoozeTaskId(id)}
                     onTaskClick={setSelectedTask}
+                    onBulkDelete={handleBulkDelete}
                   />
                 </>
               )}
@@ -183,6 +190,7 @@ const Index = () => {
                     onComplete={completeTask}
                     onSnooze={(id) => setSnoozeTaskId(id)}
                     onTaskClick={setSelectedTask}
+                    onBulkDelete={handleBulkDelete}
                     showCompleted
                   />
                 </>

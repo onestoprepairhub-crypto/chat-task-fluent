@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check, Share, Plus } from 'lucide-react';
+import { Bell, Clock, Moon, Smartphone, LogOut, BellRing, Check, Share, Plus, Sun, Monitor } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useTheme } from '@/hooks/useTheme';
 
 interface SettingsState {
   dailySummary: boolean;
@@ -25,6 +26,8 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
     quietEnd: '07:00',
   });
 
+  const { theme, setTheme } = useTheme();
+
   const { 
     isSupported, 
     isEnabled, 
@@ -36,6 +39,11 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
   } = useNotifications();
 
   const snoozeOptions = [10, 30, 60];
+  const themeOptions = [
+    { value: 'light' as const, label: 'Light', icon: Sun },
+    { value: 'dark' as const, label: 'Dark', icon: Moon },
+    { value: 'system' as const, label: 'System', icon: Monitor },
+  ];
 
   return (
     <div className="px-4 pb-24 space-y-6">
@@ -179,6 +187,34 @@ export const SettingsView = ({ onSignOut }: SettingsViewProps) => {
               {minutes} min
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Theme Section */}
+      <div className="glass-card p-4 space-y-4">
+        <h2 className="font-semibold text-foreground flex items-center gap-2">
+          <Sun className="w-5 h-5 text-primary" />
+          Appearance
+        </h2>
+
+        <div className="flex gap-2">
+          {themeOptions.map((option) => {
+            const Icon = option.icon;
+            return (
+              <button
+                key={option.value}
+                onClick={() => setTheme(option.value)}
+                className={`flex-1 py-3 px-2 rounded-xl text-sm font-medium transition-all flex items-center justify-center gap-2 ${
+                  theme === option.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {option.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

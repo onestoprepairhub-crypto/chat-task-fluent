@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Bell, Calendar, Check, Clock, ChevronRight, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, MapPin, Timer } from 'lucide-react';
 import { Task, TaskType, Priority, PRIORITY_LEVELS } from '@/hooks/useTasks';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 
 interface TaskCardProps {
@@ -8,6 +9,9 @@ interface TaskCardProps {
   onComplete: (id: string) => void;
   onSnooze: (id: string) => void;
   onClick: (task: Task) => void;
+  selectionMode?: boolean;
+  isSelected?: boolean;
+  onSelectToggle?: (id: string) => void;
 }
 
 const getTypeIcon = (taskType: TaskType) => {
@@ -65,19 +69,28 @@ const formatDuration = (minutes: number): string => {
   return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 };
 
-export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps) => {
+export const TaskCard = ({ 
+  task, 
+  onComplete, 
+  onSnooze, 
+  onClick,
+  selectionMode = false,
+  isSelected = false,
+  onSelectToggle,
+}: TaskCardProps) => {
   const [swipeX, setSwipeX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
   const startX = useRef(0);
   const threshold = 80;
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (selectionMode) return;
     startX.current = e.touches[0].clientX;
     setIsSwiping(true);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping) return;
+    if (!isSwiping || selectionMode) return;
     const currentX = e.touches[0].clientX;
     const diff = currentX - startX.current;
     // Limit swipe range
@@ -86,6 +99,7 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
   };
 
   const handleTouchEnd = () => {
+    if (selectionMode) return;
     if (swipeX > threshold) {
       onComplete(task.id);
     } else if (swipeX < -threshold) {
@@ -93,6 +107,20 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
     }
     setSwipeX(0);
     setIsSwiping(false);
+  };
+
+  const handleClick = () => {
+    if (selectionMode && onSelectToggle) {
+      onSelectToggle(task.id);
+    } else if (!isSwiping && swipeX === 0) {
+      onClick(task);
+    }
+  };
+
+  const handleLongPress = () => {
+    if (!selectionMode && onSelectToggle) {
+      onSelectToggle(task.id);
+    }
   };
 
   const getStatusBadge = () => {
@@ -115,23 +143,41 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
     );
   };
 
+  // Long press detection
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  
+  const handlePointerDown = () => {
+    longPressTimer.current = setTimeout(() => {
+      handleLongPress();
+    }, 500);
+  };
+
+  const handlePointerUp = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
   return (
     <div className="relative overflow-hidden rounded-2xl">
       {/* Swipe backgrounds */}
-      <div className="absolute inset-0 flex">
-        <div className={cn(
-          "w-1/2 bg-success flex items-center justify-start pl-4 transition-opacity",
-          swipeX > 20 ? "opacity-100" : "opacity-0"
-        )}>
-          <Check className="w-6 h-6 text-success-foreground" />
+      {!selectionMode && (
+        <div className="absolute inset-0 flex">
+          <div className={cn(
+            "w-1/2 bg-success flex items-center justify-start pl-4 transition-opacity",
+            swipeX > 20 ? "opacity-100" : "opacity-0"
+          )}>
+            <Check className="w-6 h-6 text-success-foreground" />
+          </div>
+          <div className={cn(
+            "w-1/2 bg-warning flex items-center justify-end pr-4 transition-opacity",
+            swipeX < -20 ? "opacity-100" : "opacity-0"
+          )}>
+            <Clock className="w-6 h-6 text-warning-foreground" />
+          </div>
         </div>
-        <div className={cn(
-          "w-1/2 bg-warning flex items-center justify-end pr-4 transition-opacity",
-          swipeX < -20 ? "opacity-100" : "opacity-0"
-        )}>
-          <Clock className="w-6 h-6 text-warning-foreground" />
-        </div>
-      </div>
+      )}
 
       {/* Card content */}
       <div
@@ -139,15 +185,30 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
           "task-card relative z-10 touch-action-pan-y",
           task.status === 'completed' && "opacity-60",
           task.priority === 'urgent' && "border-l-4 border-l-destructive",
-          task.priority === 'high' && "border-l-4 border-l-warning"
+          task.priority === 'high' && "border-l-4 border-l-warning",
+          isSelected && "ring-2 ring-primary bg-primary/5"
         )}
-        style={{ transform: `translateX(${swipeX}px)` }}
+        style={{ transform: selectionMode ? undefined : `translateX(${swipeX}px)` }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onClick={() => !isSwiping && swipeX === 0 && onClick(task)}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+        onClick={handleClick}
       >
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          {/* Selection checkbox */}
+          {selectionMode && (
+            <div className="flex items-center pt-1">
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => onSelectToggle?.(task.id)}
+                className="h-5 w-5"
+              />
+            </div>
+          )}
+          
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="text-muted-foreground">{getTypeIcon(task.taskType)}</span>
@@ -187,7 +248,9 @@ export const TaskCard = ({ task, onComplete, onSnooze, onClick }: TaskCardProps)
               )}
             </div>
           </div>
-          <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" />
+          {!selectionMode && (
+            <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-1" />
+          )}
         </div>
       </div>
     </div>
