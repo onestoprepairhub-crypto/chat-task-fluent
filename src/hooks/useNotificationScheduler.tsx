@@ -1,3 +1,4 @@
+import React from 'react';
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { Task } from '@/hooks/useTasks';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -49,7 +50,46 @@ export const useNotificationScheduler = ({
   const lastEODCheckRef = useRef<string | null>(null);
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
 
-  // Trigger notification helper
+  // Register service worker and listen for notification action messages
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((registration) => {
+        console.log('[NotificationScheduler] Service Worker registered:', registration.scope);
+      }).catch((error) => {
+        console.log('[NotificationScheduler] Service Worker registration failed:', error);
+      });
+
+      // Listen for messages from service worker (notification actions)
+      const handleServiceWorkerMessage = (event: MessageEvent) => {
+        const { type, action, taskId, minutes } = event.data;
+        
+        if (type === 'NOTIFICATION_ACTION') {
+          console.log('[NotificationScheduler] Received notification action:', action, taskId, minutes);
+          
+          if (action === 'snooze' && taskId && minutes) {
+            onSnooze(taskId, minutes);
+            toast({
+              title: `Snoozed for ${minutes} minutes`,
+              description: 'We\'ll remind you again later.',
+            });
+          } else if (action === 'complete' && taskId) {
+            onComplete(taskId);
+            toast({
+              title: 'Task completed! 🎉',
+            });
+          }
+        }
+      };
+
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+
+      return () => {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      };
+    }
+  }, [onComplete, onSnooze, toast]);
+
+  // Trigger notification helper with action buttons
   const triggerNotification = useCallback((task: Task, customTitle?: string, customBody?: string) => {
     const priorityEmoji = task.priority === 'urgent' ? '🔴' : 
                           task.priority === 'high' ? '🟠' : 
@@ -58,6 +98,38 @@ export const useNotificationScheduler = ({
     const title = customTitle || `${priorityEmoji} ${task.title}`;
     const body = customBody || (task.endDate ? `Due: ${task.endDate}` : 'Task reminder');
     
+    // Try to use notification with actions (requires service worker)
+    if ('serviceWorker' in navigator && 'showNotification' in ServiceWorkerRegistration.prototype) {
+      navigator.serviceWorker.ready.then(registration => {
+        registration.showNotification(title, {
+          body,
+          tag: task.id,
+          requireInteraction: true,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico',
+          actions: [
+            { action: 'snooze30', title: '⏰ 30 min' },
+            { action: 'snooze120', title: '⏰ 2 hours' },
+            { action: 'complete', title: '✅ Done' },
+          ],
+          data: { taskId: task.id },
+        } as NotificationOptions);
+      }).catch(err => {
+        console.log('[NotificationScheduler] Service worker notification failed, using fallback:', err);
+        // Fallback to basic notification
+        showBasicNotification(task, title, body);
+      });
+    } else {
+      // Fallback for browsers without service worker support
+      showBasicNotification(task, title, body);
+    }
+
+    // Always show in-app toast with action buttons
+    showToastWithActions(task, title, body);
+  }, []);
+
+  // Basic notification without actions
+  const showBasicNotification = useCallback((task: Task, title: string, body: string) => {
     const notification = showNotification(title, {
       body,
       tag: task.id,
@@ -70,13 +142,46 @@ export const useNotificationScheduler = ({
         notification.close();
       };
     }
+  }, [showNotification]);
 
+  // In-app toast with action buttons
+  const showToastWithActions = useCallback((task: Task, title: string, body: string) => {
     toast({
       title,
-      description: body,
-      duration: 30000,
+      description: (
+        <div className="space-y-2">
+          <p>{body}</p>
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={() => {
+                onSnooze(task.id, 30);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+            >
+              ⏰ 30 min
+            </button>
+            <button
+              onClick={() => {
+                onSnooze(task.id, 120);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+            >
+              ⏰ 2 hours
+            </button>
+            <button
+              onClick={() => {
+                onComplete(task.id);
+              }}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              ✅ Done
+            </button>
+          </div>
+        </div>
+      ),
+      duration: 60000, // Keep visible for 1 minute
     });
-  }, [showNotification, toast]);
+  }, [toast, onComplete, onSnooze]);
 
   // Check for tasks that are due
   const checkDueTasks = useCallback(() => {
