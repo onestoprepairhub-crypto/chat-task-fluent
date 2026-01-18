@@ -17,6 +17,10 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
   const { showNotification, isEnabled } = useNotifications();
   const { toast } = useToast();
 
+  // Check if there are any tasks with locations
+  const tasksWithLocations = tasks.filter(t => t.location && t.status !== 'completed');
+  const hasLocationTasks = tasksWithLocations.length > 0;
+
   useEffect(() => {
     setLocationSupported('geolocation' in navigator);
     
@@ -27,6 +31,8 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
         result.onchange = () => {
           setLocationPermission(result.state as 'granted' | 'denied' | 'prompt');
         };
+      }).catch(() => {
+        // Permissions API not supported
       });
     }
   }, []);
@@ -53,10 +59,6 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
       const { latitude, longitude } = position.coords;
       setCurrentLocation({ lat: latitude, lng: longitude });
 
-      const tasksWithLocations = tasks.filter(
-        (t) => t.location && t.status !== 'completed'
-      );
-
       tasksWithLocations.forEach((task) => {
         if (!task.location) return;
 
@@ -76,15 +78,16 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
           // Show notification
           if (isEnabled) {
             showNotification(`📍 ${task.title}`, {
-              body: `You're near ${task.location.name}`,
+              body: `You've arrived at ${task.location.name}`,
               tag: `location-${task.id}`,
+              requireInteraction: true,
             });
           }
 
           toast({
             title: `📍 Location Reminder`,
-            description: `${task.title} - You're near ${task.location.name}`,
-            duration: 10000,
+            description: `${task.title} - You've arrived at ${task.location.name}`,
+            duration: 30000,
           });
         }
 
@@ -94,28 +97,15 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
         }
       });
     },
-    [tasks, calculateDistance, isEnabled, showNotification, toast]
+    [tasksWithLocations, calculateDistance, isEnabled, showNotification, toast]
   );
 
   const startWatching = useCallback(async () => {
     if (!locationSupported) {
-      toast({
-        title: 'Not Supported',
-        description: 'Location services are not supported in this browser.',
-        variant: 'destructive',
-      });
       return false;
     }
 
     try {
-      // First get current position to trigger permission prompt
-      await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-        });
-      });
-
       // Start watching position
       watchIdRef.current = navigator.geolocation.watchPosition(
         checkLocationTriggers,
@@ -123,11 +113,6 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
           console.error('Location error:', error);
           if (error.code === error.PERMISSION_DENIED) {
             setLocationPermission('denied');
-            toast({
-              title: 'Location Access Denied',
-              description: 'Please enable location access in your browser settings.',
-              variant: 'destructive',
-            });
           }
           setIsWatching(false);
         },
@@ -140,21 +125,12 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
 
       setIsWatching(true);
       setLocationPermission('granted');
-      toast({
-        title: 'Location Reminders Enabled 📍',
-        description: 'You\'ll be notified when you\'re near task locations.',
-      });
       return true;
     } catch (error) {
       console.error('Failed to start location watching:', error);
-      toast({
-        title: 'Location Error',
-        description: 'Failed to access your location. Please try again.',
-        variant: 'destructive',
-      });
       return false;
     }
-  }, [locationSupported, checkLocationTriggers, toast]);
+  }, [locationSupported, checkLocationTriggers]);
 
   const stopWatching = useCallback(() => {
     if (watchIdRef.current !== null) {
@@ -164,6 +140,15 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
     setIsWatching(false);
     notifiedLocationsRef.current.clear();
   }, []);
+
+  // Auto-start watching when there are location tasks and permission is granted
+  useEffect(() => {
+    if (hasLocationTasks && locationPermission === 'granted' && !isWatching && locationSupported) {
+      startWatching();
+    } else if (!hasLocationTasks && isWatching) {
+      stopWatching();
+    }
+  }, [hasLocationTasks, locationPermission, isWatching, locationSupported, startWatching, stopWatching]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -181,5 +166,6 @@ export const useLocationReminder = ({ tasks }: UseLocationReminderProps) => {
     locationPermission,
     startWatching,
     stopWatching,
+    hasLocationTasks,
   };
 };
