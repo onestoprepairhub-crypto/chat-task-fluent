@@ -346,8 +346,30 @@ export const useTasks = () => {
       const dbUpdates: Record<string, any> = {};
       
       if (updates.title !== undefined) dbUpdates.title = updates.title;
-      if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate;
-      if (updates.reminderTimes !== undefined) dbUpdates.reminder_times = updates.reminderTimes;
+      if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate || null;
+      if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate || null;
+      if (updates.reminderTimes !== undefined) {
+        dbUpdates.reminder_times = updates.reminderTimes;
+        // Recalculate next_reminder based on the first reminder time
+        if (updates.reminderTimes.length > 0) {
+          const firstReminder = updates.reminderTimes[0];
+          // If it's already an ISO string, use it directly
+          if (firstReminder.includes('T')) {
+            const reminderDate = new Date(firstReminder);
+            // Only set if in the future
+            if (reminderDate > new Date()) {
+              dbUpdates.next_reminder = firstReminder;
+            } else {
+              // Find the next future reminder
+              const futureReminder = updates.reminderTimes.find(r => new Date(r) > new Date());
+              dbUpdates.next_reminder = futureReminder || null;
+            }
+          } else {
+            // Parse and calculate next reminder
+            dbUpdates.next_reminder = calculateNextReminder(firstReminder, updates.startDate);
+          }
+        }
+      }
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.taskType !== undefined) dbUpdates.task_type = updates.taskType;
       if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule || null;
