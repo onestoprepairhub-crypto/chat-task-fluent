@@ -193,7 +193,20 @@ export const useTasks = () => {
     if (!user) return;
 
     try {
-      const nextReminder = calculateNextReminder(parsedTask.reminder_times[0], parsedTask.start_date);
+      // Convert all reminder times to ISO format for proper scheduling
+      const isoReminderTimes = convertReminderTimesToISO(
+        parsedTask.reminder_times, 
+        parsedTask.start_date
+      );
+      
+      // Use the first ISO reminder as next_reminder
+      const nextReminder = isoReminderTimes[0] || calculateNextReminder(
+        parsedTask.reminder_times[0], 
+        parsedTask.start_date
+      );
+
+      console.log('[addTask] Saving task with ISO reminder times:', isoReminderTimes);
+      console.log('[addTask] Next reminder:', nextReminder);
 
       const { data, error } = await supabase
         .from('tasks')
@@ -203,9 +216,10 @@ export const useTasks = () => {
           task_type: parsedTask.task_type,
           start_date: parsedTask.start_date || null,
           end_date: parsedTask.end_date || null,
-          reminder_times: parsedTask.reminder_times,
+          reminder_times: isoReminderTimes, // Store as ISO strings
           repeat_rule: parsedTask.repeat_rule || null,
           next_reminder: nextReminder,
+          priority: parsedTask.priority || 'medium',
         })
         .select()
         .single();
@@ -348,28 +362,26 @@ export const useTasks = () => {
       if (updates.title !== undefined) dbUpdates.title = updates.title;
       if (updates.startDate !== undefined) dbUpdates.start_date = updates.startDate || null;
       if (updates.endDate !== undefined) dbUpdates.end_date = updates.endDate || null;
+      
       if (updates.reminderTimes !== undefined) {
-        dbUpdates.reminder_times = updates.reminderTimes;
-        // Recalculate next_reminder based on the first reminder time
-        if (updates.reminderTimes.length > 0) {
-          const firstReminder = updates.reminderTimes[0];
-          // If it's already an ISO string, use it directly
-          if (firstReminder.includes('T')) {
-            const reminderDate = new Date(firstReminder);
-            // Only set if in the future
-            if (reminderDate > new Date()) {
-              dbUpdates.next_reminder = firstReminder;
-            } else {
-              // Find the next future reminder
-              const futureReminder = updates.reminderTimes.find(r => new Date(r) > new Date());
-              dbUpdates.next_reminder = futureReminder || null;
-            }
-          } else {
-            // Parse and calculate next reminder
-            dbUpdates.next_reminder = calculateNextReminder(firstReminder, updates.startDate);
-          }
+        // Convert all reminder times to ISO format
+        const isoReminderTimes = convertReminderTimesToISO(
+          updates.reminderTimes,
+          updates.startDate
+        );
+        dbUpdates.reminder_times = isoReminderTimes;
+        
+        // Set next_reminder to the first future reminder
+        if (isoReminderTimes.length > 0) {
+          const now = new Date();
+          const futureReminder = isoReminderTimes.find(r => new Date(r) > now);
+          dbUpdates.next_reminder = futureReminder || isoReminderTimes[0];
         }
+        
+        console.log('[updateTask] Updated reminder times:', isoReminderTimes);
+        console.log('[updateTask] Next reminder:', dbUpdates.next_reminder);
       }
+      
       if (updates.status !== undefined) dbUpdates.status = updates.status;
       if (updates.taskType !== undefined) dbUpdates.task_type = updates.taskType;
       if (updates.repeatRule !== undefined) dbUpdates.repeat_rule = updates.repeatRule || null;
@@ -398,8 +410,18 @@ export const useTasks = () => {
 
       if (error) throw error;
 
+      // Update local state with formatted times
       setTasks((prev) =>
-        prev.map((task) => (task.id === taskId ? { ...task, ...updates } : task))
+        prev.map((task) => {
+          if (task.id === taskId) {
+            const updated = { ...task, ...updates };
+            if (dbUpdates.next_reminder) {
+              updated.nextReminder = formatNextReminder(dbUpdates.next_reminder);
+            }
+            return updated;
+          }
+          return task;
+        })
       );
 
       toast({
@@ -435,49 +457,142 @@ export const useTasks = () => {
 };
 
 // Helper functions
-function formatNextReminder(isoString: string): string {
-  const date = new Date(isoString);
-  const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
-  const isTomorrow =
-    date.toDateString() ===
-    new Date(now.getTime() + 24 * 60 * 60 * 1000).toDateString();
 
-  const timeStr = date.toLocaleTimeString('en-US', {
+// Format next reminder for display (converts UTC to IST)
+function formatNextReminder(isoString: string): string {
+  // Parse the UTC time
+  const utcDate = new Date(isoString);
+  
+  // Convert to IST for display
+  const istTime = utcDate.getTime() + (IST_OFFSET_MINUTES * 60 * 1000);
+  const istDate = new Date(istTime);
+  
+  // Get "now" in IST for comparison
+  const now = new Date();
+  const nowUTC = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+  const nowIST = new Date(nowUTC + (IST_OFFSET_MINUTES * 60 * 1000));
+  
+  // Compare dates in IST
+  const isToday = istDate.toDateString() === nowIST.toDateString();
+  const tomorrow = new Date(nowIST);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = istDate.toDateString() === tomorrow.toDateString();
+
+  // Format time in IST
+  const timeStr = istDate.toLocaleTimeString('en-IN', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
+    timeZone: 'Asia/Kolkata',
   });
 
   if (isToday) return `Today, ${timeStr}`;
   if (isTomorrow) return `Tomorrow, ${timeStr}`;
-  return `${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${timeStr}`;
+  return `${istDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' })}, ${timeStr}`;
 }
 
-function calculateNextReminder(time: string, startDate?: string): string {
+// IST offset: UTC+5:30 = 330 minutes
+const IST_OFFSET_MINUTES = 330;
+
+// Convert IST time to UTC ISO string
+function istToUTC(istDate: Date): string {
+  // Subtract IST offset to get UTC
+  const utcTime = istDate.getTime() - (IST_OFFSET_MINUTES * 60 * 1000);
+  return new Date(utcTime).toISOString();
+}
+
+// Get current time in IST
+function getNowIST(): Date {
   const now = new Date();
-  const baseDate = startDate ? new Date(startDate) : now;
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60 * 1000);
+  return new Date(utcTime + (IST_OFFSET_MINUTES * 60 * 1000));
+}
+
+// Parse time string and return IST Date object
+function parseTimeToIST(time: string, baseDate: Date): Date | null {
+  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!match) return null;
+  
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const isPM = match[3].toUpperCase() === 'PM';
+  
+  if (isPM && hours !== 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  
+  const result = new Date(baseDate);
+  result.setHours(hours, minutes, 0, 0);
+  return result;
+}
+
+export function calculateNextReminder(time: string, startDate?: string): string {
+  const nowIST = getNowIST();
+  
+  // If time is already ISO format, return as-is
+  if (time.includes('T')) {
+    return time;
+  }
+  
+  // Parse the base date in IST
+  let baseDate: Date;
+  if (startDate) {
+    // startDate is in YYYY-MM-DD format, treat as IST date
+    const [year, month, day] = startDate.split('-').map(Number);
+    baseDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+  } else {
+    baseDate = new Date(nowIST);
+  }
   
   // Parse time like "9:00 AM"
-  const match = time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!match) {
-    // Default to 9 AM
+  const parsedTime = parseTimeToIST(time, baseDate);
+  if (!parsedTime) {
+    // Default to 9 AM IST
     baseDate.setHours(9, 0, 0, 0);
   } else {
-    let hours = parseInt(match[1]);
-    const minutes = parseInt(match[2]);
-    const isPM = match[3].toUpperCase() === 'PM';
-    
-    if (isPM && hours !== 12) hours += 12;
-    if (!isPM && hours === 12) hours = 0;
-    
-    baseDate.setHours(hours, minutes, 0, 0);
+    baseDate = parsedTime;
   }
 
-  // If the time has passed today, set for tomorrow
-  if (baseDate <= now) {
+  // If the time has passed today (in IST), set for tomorrow
+  if (baseDate <= nowIST && !startDate) {
     baseDate.setDate(baseDate.getDate() + 1);
   }
 
-  return baseDate.toISOString();
+  // Convert IST to UTC for storage
+  return istToUTC(baseDate);
+}
+
+// Convert simple time to full ISO string for storage (used by addTask)
+export function convertReminderTimesToISO(reminderTimes: string[], startDate?: string): string[] {
+  const nowIST = getNowIST();
+  
+  return reminderTimes.map(time => {
+    // Already ISO format
+    if (time.includes('T')) {
+      return time;
+    }
+    
+    // Parse the base date in IST
+    let baseDate: Date;
+    if (startDate) {
+      const [year, month, day] = startDate.split('-').map(Number);
+      baseDate = new Date(year, month - 1, day, 0, 0, 0, 0);
+    } else {
+      baseDate = new Date(nowIST);
+    }
+    
+    // Parse time
+    const parsedTime = parseTimeToIST(time, baseDate);
+    if (!parsedTime) {
+      baseDate.setHours(9, 0, 0, 0);
+    } else {
+      baseDate = parsedTime;
+    }
+    
+    // If time has passed today, set for tomorrow (only if no specific date)
+    if (baseDate <= nowIST && !startDate) {
+      baseDate.setDate(baseDate.getDate() + 1);
+    }
+    
+    return istToUTC(baseDate);
+  });
 }
