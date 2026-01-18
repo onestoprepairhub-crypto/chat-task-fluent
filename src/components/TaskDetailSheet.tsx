@@ -1,11 +1,13 @@
-import { useState, useMemo } from 'react';
-import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, Flag, Timer, MapPin, Map, Plus } from 'lucide-react';
+import { useState, useMemo, lazy, Suspense } from 'react';
+import { X, Trash2, Check, Bell, Calendar, Clock, Save, Repeat, Circle, BellRing, Target, FolderKanban, ShoppingBag, Phone, Mail, CreditCard, Heart, Dumbbell, GraduationCap, Flame, Flag, Timer, MapPin, Map, Plus, Loader2 } from 'lucide-react';
 import { Task, TASK_TYPES, REPEAT_RULES, PRIORITY_LEVELS, TIME_ESTIMATES, TaskType, RepeatRule, Priority, TaskLocation } from '@/hooks/useTasks';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LocationPicker } from '@/components/LocationPicker';
 import { cn } from '@/lib/utils';
+
+// Lazy load LocationPicker to prevent Google Maps from affecting mobile rendering
+const LocationPicker = lazy(() => import('@/components/LocationPicker'));
 
 interface ReminderDateTime {
   date: string; // YYYY-MM-DD
@@ -511,13 +513,22 @@ export const TaskDetailSheet = ({
         </div>
       </div>
 
-      {/* Location Picker Modal */}
+      {/* Location Picker Modal - Lazy loaded */}
       {showLocationPicker && (
-        <LocationPicker
-          value={location}
-          onChange={handleLocationChange}
-          onClose={() => setShowLocationPicker(false)}
-        />
+        <Suspense fallback={
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/80 backdrop-blur-sm">
+            <div className="bg-card rounded-2xl p-6 shadow-xl border border-border">
+              <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
+              <p className="text-muted-foreground mt-2 text-center">Loading map...</p>
+            </div>
+          </div>
+        }>
+          <LocationPicker
+            value={location}
+            onChange={handleLocationChange}
+            onClose={() => setShowLocationPicker(false)}
+          />
+        </Suspense>
       )}
     </>
   );
