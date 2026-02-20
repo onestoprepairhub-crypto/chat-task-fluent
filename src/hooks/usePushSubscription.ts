@@ -20,7 +20,7 @@ export const usePushSubscription = () => {
 
       try {
         const registration = await navigator.serviceWorker.ready;
-        const existingSub = await registration.pushManager.getSubscription();
+        const existingSub = await (registration as any).pushManager.getSubscription();
         
         if (existingSub) {
           setSubscription(existingSub);
@@ -80,7 +80,7 @@ export const usePushSubscription = () => {
       const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
 
       // Subscribe to push
-      const pushSubscription = await registration.pushManager.subscribe({
+      const pushSubscription = await (registration as any).pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey,
       });
